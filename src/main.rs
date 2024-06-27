@@ -38,28 +38,29 @@ fn main() {
                 .unwrap()
         }
     });
+    {
+        env_logger::Builder::new()
+            .target(env_logger::Target::Pipe(target))
+            .filter(None, LevelFilter::Debug)
+            .format(|buf, record| {
+                writeln!(
+                    buf,
+                    "[{} {} {}:{}] {}",
+                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+                    record.level(),
+                    record.file().unwrap_or("unknown"),
+                    record.line().unwrap_or(0),
+                    record.args()
+                )
+            })
+            .init();
+        debug!("Starting Engine");
 
-    env_logger::Builder::new()
-        .target(env_logger::Target::Pipe(target))
-        .filter(None, LevelFilter::Debug)
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "[{} {} {}:{}] {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
-                record.level(),
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
-                record.args()
-            )
-        })
-        .init();
-    debug!("Starting Engine");
+        send_noti("Engine Started 1");
 
-    send_noti("Engine Started 1");
-
-    let mut uci = uci::UCI::new();
-    uci.rx();
+        let mut uci = uci::UCI::new();
+        uci.rx();
+    }
 }
 
 pub fn send_noti<S: ToString>(msg: S) {

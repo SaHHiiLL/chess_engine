@@ -2,11 +2,13 @@ use std::{
     collections::VecDeque,
     io::{self, Write},
     str::FromStr,
+    thread::sleep,
+    time::{Duration, SystemTime},
 };
 
 use chess::ChessMove;
 
-use crate::engine::Engine;
+use crate::{engine::Engine, send_noti};
 
 pub struct UCI {
     engine: Engine,
@@ -75,7 +77,27 @@ impl UCI {
     }
 
     fn handle_go_command(&mut self, _args: VecDeque<&str>) {
-        log::debug!("thinking...")
+        log::debug!("thinking...");
+        let now = SystemTime::now();
+
+        let msg = format!( "info depth 1 seldepth 0\n info score cp 13  depth 1 nodes 13 time 15 pv f1b5\n info depth 2 seldepth 2\n info nps 15937\n info score cp 14  depth 2 nodes 255 time 15 pv f1c4 f8c5 \n info depth 2 seldepth 7 nodes 255\n info depth 3 seldepth 7\n info nps 26437\n info score cp 20  depth 3 nodes 423 time 15 pv f1c4 g8f6 b1c3\n info nps 41562");
+
+        println!("{}", msg);
+
+        // we sleep for 2 seconds
+        sleep(Duration::from_secs(2));
+        match now.elapsed() {
+            Ok(elapsed) => {
+                let mov = self.engine.get_best_mov().to_string();
+                let s_mov = self.engine.get_best_mov().to_string();
+                let msg = format!("bestmove {mov} ponder {s_mov}");
+                send_noti(msg.clone());
+                self.tx(msg);
+            }
+            Err(e) => {
+                log::error!("Could not sleep");
+            }
+        }
     }
 
     fn handle_position_command(&mut self, mut cmd: VecDeque<&str>) {
