@@ -1,0 +1,19 @@
+[2024-06-26 18:48:24.628 DEBUG src/main.rs:57] Starting Engine
+[2024-06-26 18:48:24.628 DEBUG src/uci.rs:38] Message Received: `uci` args: []
+[2024-06-26 18:48:24.628 DEBUG src/uci.rs:185] Sending Message: uciok
+[2024-06-26 18:48:24.628 DEBUG src/uci.rs:38] Message Received: `isready` args: []
+[2024-06-26 18:48:24.628 DEBUG src/uci.rs:185] Sending Message: readyok
+[2024-06-26 18:48:24.629 DEBUG src/uci.rs:38] Message Received: `ucinewgame` args: []
+[2024-06-26 18:48:24.629 DEBUG src/uci.rs:74] Uci New Game
+[2024-06-26 18:48:30.975 DEBUG src/uci.rs:38] Message Received: `position` args: ["startpos", "moves", "e2e4", "d7d5", "b1c3"]
+[2024-06-26 18:48:30.975 DEBUG src/uci.rs:82] Handling position command
+[2024-06-26 18:48:30.976 DEBUG src/uci.rs:148] start position
+[2024-06-26 18:48:30.976 DEBUG src/uci.rs:150] Moves: [ChessMove { source: Square(12), dest: Square(28), promotion: None }, ChessMove { source: Square(51), dest: Square(35), promotion: None }, ChessMove { source: Square(1), dest: Square(18), promotion: None }]
+[2024-06-26 18:48:30.976 DEBUG src/engine.rs:48] Board Side: Black
+[2024-06-26 18:48:30.976 INFO src/engine.rs:41] New Genrated Moves: [ChessMove { source: Square(35), dest: Square(27), promotion: None }, ChessMove { source: Square(35), dest: Square(28), promotion: None }, ChessMove { source: Square(48), dest: Square(32), promotion: None }, ChessMove { source: Square(48), dest: Square(40), promotion: None }, ChessMove { source: Square(49), dest: Square(33), promotion: None }, ChessMove { source: Square(49), dest: Square(41), promotion: None }, ChessMove { source: Square(50), dest: Square(34), promotion: None }, ChessMove { source: Square(50), dest: Square(42), promotion: None }, ChessMove { source: Square(52), dest: Square(36), promotion: None }, ChessMove { source: Square(52), dest: Square(44), promotion: None }, ChessMove { source: Square(53), dest: Square(37), promotion: None }, ChessMove { source: Square(53), dest: Square(45), promotion: None }, ChessMove { source: Square(54), dest: Square(38), promotion: None }, ChessMove { source: Square(54), dest: Square(46), promotion: None }, ChessMove { source: Square(55), dest: Square(39), promotion: None }, ChessMove { source: Square(55), dest: Square(47), promotion: None }, ChessMove { source: Square(57), dest: Square(40), promotion: None }, ChessMove { source: Square(57), dest: Square(42), promotion: None }, ChessMove { source: Square(57), dest: Square(51), promotion: None }, ChessMove { source: Square(62), dest: Square(45), promotion: None }, ChessMove { source: Square(62), dest: Square(47), promotion: None }, ChessMove { source: Square(58), dest: Square(23), promotion: None }, ChessMove { source: Square(58), dest: Square(30), promotion: None }, ChessMove { source: Square(58), dest: Square(37), promotion: None }, ChessMove { source: Square(58), dest: Square(44), promotion: None }, ChessMove { source: Square(58), dest: Square(51), promotion: None }, ChessMove { source: Square(59), dest: Square(43), promotion: None }, ChessMove { source: Square(59), dest: Square(51), promotion: None }, ChessMove { source: Square(60), dest: Square(51), promotion: None }]
+[2024-06-26 18:48:30.976 DEBUG src/uci.rs:38] Message Received: `go` args: ["infinite"]
+[2024-06-26 18:48:30.976 DEBUG src/uci.rs:78] thinking...
+[2024-06-26 18:48:39.151 DEBUG src/uci.rs:38] Message Received: `stop` args: []
+[2024-06-26 18:48:39.151 DEBUG src/uci.rs:185] Sending Message: bestmove c7c6
+[2024-06-26 18:48:46.027 DEBUG src/uci.rs:38] Message Received: `quit` args: []
+[2024-06-26 18:48:46.028 DEBUG src/uci.rs:48] Quit..

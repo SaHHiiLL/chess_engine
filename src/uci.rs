@@ -1,33 +1,21 @@
-use std::io::{self, Stdin, Write};
+use std::{
+    collections::VecDeque,
+    io::{self, Write},
+    str::FromStr,
+};
+
+use chess::ChessMove;
 
 use crate::engine::Engine;
 
-trait RemoveFirst {
-    type Output;
-    fn remove_first(&mut self) -> Option<Self::Output>;
-}
-
-impl<T> RemoveFirst for Vec<T> {
-    type Output = T;
-    fn remove_first(&mut self) -> Option<T> {
-        if self.len() == 0 {
-            None
-        } else {
-            Some(self.swap_remove(0))
-        }
-    }
-}
-
 pub struct UCI {
     engine: Engine,
-    stdin: Stdin,
 }
 
 impl UCI {
     pub fn new() -> Self {
         Self {
             engine: Engine::new(),
-            stdin: std::io::stdin(),
         }
     }
 
@@ -37,11 +25,17 @@ impl UCI {
             // read
             let _ = io::stdout().flush();
             let _ = io::stdin().read_line(&mut buffer).unwrap();
-            let mut input = buffer.split(' ').collect::<Vec<_>>();
-            let cmd = match input.remove_first() {
+            let mut input = buffer.trim().split(' ').collect::<VecDeque<_>>();
+            let cmd = match input.pop_front() {
                 Some(s) => s,
                 None => continue,
             };
+
+            if cmd.is_empty() {
+                continue;
+            }
+
+            log::debug!("Message Received: `{cmd}` args: {input:?}");
 
             match cmd {
                 "uci" => self.tx("uciok"),
@@ -57,8 +51,8 @@ impl UCI {
                 "d" => self.handle_debug_command(),
                 " " => {}
                 _ => {
-                    let input = input.join(" ");
-                    log::error!("Unknown Command: {cmd} -- args: {input}");
+                    let input = input.into_iter().collect::<Vec<_>>().join(" ");
+                    log::error!("Unknown Command: `{cmd}` -- args: `{input}`");
                 }
             }
 
@@ -70,7 +64,9 @@ impl UCI {
         todo!("Handle debug command");
     }
     fn handle_stop_command(&mut self) {
-        todo!("Handle stop commnand");
+        let mov = self.engine.get_best_mov().to_string();
+        let msg = format!("bestmove {mov}");
+        self.tx(msg);
     }
 
     fn handle_ucinewgame_command(&mut self) {
@@ -78,15 +74,115 @@ impl UCI {
         log::debug!("Uci New Game");
     }
 
-    fn handle_go_command(&mut self, cmd: Vec<&str>) {
-        todo!("Handle go comnad");
+    fn handle_go_command(&mut self, _args: VecDeque<&str>) {
+        log::debug!("thinking...")
     }
 
-    fn handle_position_command(&mut self, cmd: Vec<&str>) {}
+    fn handle_position_command(&mut self, mut cmd: VecDeque<&str>) {
+        log::debug!("Handling position command");
+
+        let mut position_type = match cmd.pop_front() {
+            Some(pt) => pt,
+            None => {
+                log::error!("Expected Args -- found none");
+                return;
+            }
+        };
+
+        fn add_moves(mut str: VecDeque<&str>) -> VecDeque<ChessMove> {
+            let mut res = VecDeque::new();
+            while let Some(mov) = str.pop_front() {
+                let _ = mov
+                    .parse::<ChessMove>()
+                    .map(|chessmove| res.push_back(chessmove));
+            }
+            res
+        }
+
+        let mut last_move = None;
+        let mut last_number = None;
+        if position_type != "fen" && position_type != "startpos" {
+            let _ = ChessMove::from_str(position_type)
+                .map(|d| last_move = Some(d))
+                .map_err(|_| {
+                    let _ = position_type
+                        .parse::<usize>()
+                        .map(|d| last_number = Some(d));
+                });
+            position_type = match cmd.pop_front() {
+                Some(pt) => pt,
+                None => {
+                    log::error!("Expected Args -- found none");
+                    return;
+                }
+            };
+        }
+
+        match position_type {
+            "fen" => {
+                log::debug!("position command received: parsing fen");
+                let msg = format!(
+                    "current vec: {:?}",
+                    cmd.clone().into_iter().collect::<Vec<_>>()
+                );
+                crate::send_noti(msg);
+
+                let mut fen_part = Vec::new();
+                while let Some(fp) = cmd.pop_front() {
+                    if fp == "moves" {
+                        break;
+                    } else {
+                        fen_part.push(fp);
+                    }
+                }
+                let fen = fen_part.join(" ");
+                log::debug!("FEN: {fen}");
+                self.engine = Engine::from_fen(fen);
+
+                let moves = add_moves(cmd);
+                log::debug!("Moves: {moves:?}");
+
+                self.engine.play_move(moves.into());
+            }
+            "startpos" => {
+                log::debug!("start position");
+                let moves = add_moves(cmd);
+                log::debug!("Moves: {moves:?}");
+
+                self.engine.play_move(moves.into());
+            }
+            _ => {
+                log::error!("Invalid args");
+                let msg = "invalid args";
+                crate::send_noti(msg);
+            }
+        };
+
+        // match position_type {
+        //     "fen" => {
+        //         //TODO: have to fix this asap
+        //         let cmd: Vec<String> = cmd.into_iter().collect();
+        //         let fen_part = match cmd.iter().position(|d| *d == "moves") {
+        //             Some(idx) => &cmd[1..idx],
+        //             None => &cmd[1..cmd.len()],
+        //         };
+        //         self.engine = Engine::from_fen(fen_part.join(" "));
+        //         log::debug!("Engine Set to fen position {fen_part:?}");
+        //
+        //         add_moves(cmd);
+        //     }
+        //     "startpos" => {
+        //         log::debug!("setting board to default position");
+        //         self.engine.set_default_board();
+        //         add_moves(cmd);
+        //     }
+        //     _ => log::error!("Invalid Argument for position command: {cmd:?}"),
+        // }
+    }
 
     fn tx<S: ToString>(&self, msg: S) {
         let msg = msg.to_string();
         log::debug!("Sending Message: {msg}");
-        println!("msg");
+        println!("{msg}");
     }
 }
