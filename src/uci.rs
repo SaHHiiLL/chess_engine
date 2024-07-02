@@ -37,7 +37,14 @@ impl UCI {
                 continue;
             }
 
-            log::debug!("Message Received: `{cmd}` args: {input:?}");
+            log::debug!(
+                "Message Received: `{cmd}` args: {}",
+                input
+                    .iter()
+                    .map(|d| d.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
 
             match cmd {
                 "uci" => self.tx("uciok"),
@@ -78,26 +85,9 @@ impl UCI {
 
     fn handle_go_command(&mut self, _args: VecDeque<&str>) {
         log::debug!("thinking...");
-        let now = SystemTime::now();
-
-        let msg = format!( "info depth 1 seldepth 0\n info score cp 13  depth 1 nodes 13 time 15 pv f1b5\n info depth 2 seldepth 2\n info nps 15937\n info score cp 14  depth 2 nodes 255 time 15 pv f1c4 f8c5 \n info depth 2 seldepth 7 nodes 255\n info depth 3 seldepth 7\n info nps 26437\n info score cp 20  depth 3 nodes 423 time 15 pv f1c4 g8f6 b1c3\n info nps 41562");
-
-        println!("{}", msg);
-
-        // we sleep for 2 seconds
-        sleep(Duration::from_secs(2));
-        match now.elapsed() {
-            Ok(elapsed) => {
-                let mov = self.engine.get_best_mov().to_string();
-                let s_mov = self.engine.get_best_mov().to_string();
-                let msg = format!("bestmove {mov} ponder {s_mov}");
-                send_noti(msg.clone());
-                self.tx(msg);
-            }
-            Err(e) => {
-                log::error!("Could not sleep");
-            }
-        }
+        let mov = self.engine.get_best_mov().to_string();
+        let msg = format!("bestmove {mov}");
+        self.tx(msg);
     }
 
     fn handle_position_command(&mut self, mut cmd: VecDeque<&str>) {
@@ -179,27 +169,6 @@ impl UCI {
                 crate::send_noti(msg);
             }
         };
-
-        // match position_type {
-        //     "fen" => {
-        //         //TODO: have to fix this asap
-        //         let cmd: Vec<String> = cmd.into_iter().collect();
-        //         let fen_part = match cmd.iter().position(|d| *d == "moves") {
-        //             Some(idx) => &cmd[1..idx],
-        //             None => &cmd[1..cmd.len()],
-        //         };
-        //         self.engine = Engine::from_fen(fen_part.join(" "));
-        //         log::debug!("Engine Set to fen position {fen_part:?}");
-        //
-        //         add_moves(cmd);
-        //     }
-        //     "startpos" => {
-        //         log::debug!("setting board to default position");
-        //         self.engine.set_default_board();
-        //         add_moves(cmd);
-        //     }
-        //     _ => log::error!("Invalid Argument for position command: {cmd:?}"),
-        // }
     }
 
     fn tx<S: ToString>(&self, msg: S) {

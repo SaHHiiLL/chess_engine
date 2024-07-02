@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::{fs::File, path::Path};
 
+use chrono::Utc;
 use log::{debug, error, LevelFilter};
 
 extern crate chess;
@@ -8,17 +9,26 @@ mod engine;
 mod uci;
 
 fn main() {
-    let file_path = Path::new("/home/Sahil/programing/rust/chess_engine/chess_engine.txt");
+    let file_path = Path::new("/home/Sahil/programing/rust/chess_engine/log/chess_engine.txt");
     let target = Box::new({
         if file_path.exists() {
-            File::open(file_path)
+            let time = Utc::now();
+
+            let new_name = format!(
+                "/home/Sahil/programing/rust/chess_engine/log/chess_engine{}.txt",
+                time.to_rfc3339()
+            );
+            let new_name = Path::new(&new_name);
+            let _ = std::fs::rename(file_path, new_name);
+
+            File::create(file_path)
                 .map(|file| {
-                    let msg = format!("Opened File: {file:?}");
+                    let msg = format!("Created File: {file:?}");
                     send_noti(msg);
                     file
                 })
                 .map_err(|err| {
-                    let msg = format!("Could not open file: {}", err);
+                    let msg = format!("Could not create the file: {}", err);
                     send_noti(msg);
                     err
                 })
@@ -56,11 +66,20 @@ fn main() {
             .init();
         debug!("Starting Engine");
 
-        send_noti("Engine Started 1");
+        send_noti("Engine Started HELLO");
 
         let mut uci = uci::UCI::new();
         uci.rx();
     }
+
+    let time = Utc::now();
+
+    let new_name = format!(
+        "/home/Sahil/programing/rust/chess_engine/log/chess_engine{}.txt",
+        time.to_rfc3339()
+    );
+    let new_name = Path::new(&new_name);
+    let _ = std::fs::rename(file_path, new_name);
 }
 
 pub fn send_noti<S: ToString>(msg: S) {

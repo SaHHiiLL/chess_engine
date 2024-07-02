@@ -1,0 +1,7 @@
+[2024-07-02 12:14:47.009 DEBUG src/main.rs:58] Starting Engine
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:40] Message Received: `uci` args: 
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:176] Sending Message: uciok
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:40] Message Received: `isready` args: 
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:176] Sending Message: readyok
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:40] Message Received: `quit` args: 
+[2024-07-02 12:14:47.010 DEBUG src/uci.rs:57] Quit..
