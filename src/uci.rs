@@ -2,22 +2,23 @@ use std::{
     collections::VecDeque,
     io::{self, Write},
     str::FromStr,
-    thread::sleep,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use chess::ChessMove;
 
-use crate::{engine::Engine, send_noti};
+use crate::engine::Engine;
 
 pub struct UCI {
     engine: Engine,
+    curr_think_time: u64,
 }
 
 impl UCI {
     pub fn new() -> Self {
         Self {
             engine: Engine::new(),
+            curr_think_time: 0,
         }
     }
 
@@ -26,68 +27,89 @@ impl UCI {
         loop {
             // read
             let _ = io::stdout().flush();
-            let _ = io::stdin().read_line(&mut buffer).unwrap();
-            let mut input = buffer.trim().split(' ').collect::<VecDeque<_>>();
-            let cmd = match input.pop_front() {
-                Some(s) => s,
-                None => continue,
+            match io::stdin().read_line(&mut buffer) {
+                Ok(_) => {
+                    let mut input = buffer.trim().split(' ').collect::<VecDeque<_>>();
+                    let cmd = match input.pop_front() {
+                        Some(s) => s,
+                        None => continue,
+                    };
+
+                    if cmd.is_empty() {
+                        continue;
+                    }
+
+                    log::debug!(
+                        "Message Received: `{cmd}` args: {}",
+                        input
+                            .iter()
+                            .map(|d| d.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    );
+
+                    match cmd {
+                        "uci" => {
+                            self.tx("id name NotSoBrightBot");
+                            self.tx("id author Sahil");
+                            self.tx("uciok");
+                        }
+                        "isready" => self.tx("readyok"),
+                        "position" => self.handle_position_command(input),
+                        "ucinewgame" => self.handle_ucinewgame_command(),
+                        "go" => self.handle_go_command(input),
+                        "stop" => self.handle_stop_command(),
+                        "quit" => {
+                            break;
+                        }
+                        "d" => self.handle_debug_command(),
+                        " " => {}
+                        _ => {
+                            let input = input.into_iter().collect::<Vec<_>>().join(" ");
+                            log::error!("Unknown Command: `{cmd}` -- args: `{input}`");
+                        }
+                    }
+                }
+                Err(_) => todo!(),
             };
-
-            if cmd.is_empty() {
-                continue;
-            }
-
-            log::debug!(
-                "Message Received: `{cmd}` args: {}",
-                input
-                    .iter()
-                    .map(|d| d.to_string())
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            );
-
-            match cmd {
-                "uci" => self.tx("uciok"),
-                "isready" => self.tx("readyok"),
-                "position" => self.handle_position_command(input),
-                "ucinewgame" => self.handle_ucinewgame_command(),
-                "go" => self.handle_go_command(input),
-                "stop" => self.handle_stop_command(),
-                "quit" => {
-                    log::debug!("Quit..");
-                    break;
-                }
-                "d" => self.handle_debug_command(),
-                " " => {}
-                _ => {
-                    let input = input.into_iter().collect::<Vec<_>>().join(" ");
-                    log::error!("Unknown Command: `{cmd}` -- args: `{input}`");
-                }
-            }
-
             buffer.clear();
         }
     }
 
     fn handle_debug_command(&mut self) {
-        todo!("Handle debug command");
+        panic!("Really weird");
     }
     fn handle_stop_command(&mut self) {
-        let mov = self.engine.get_best_mov().to_string();
-        let msg = format!("bestmove {mov}");
-        self.tx(msg);
+        if let Some(mov) = self.engine.get_best_mov() {
+            let msg = format!("bestmove {mov}");
+            self.tx(msg);
+        }
     }
 
     fn handle_ucinewgame_command(&mut self) {
-        self.engine.set_default_board();
+        self.engine = self.engine.get_default_board();
         log::debug!("Uci New Game");
     }
 
-    fn handle_go_command(&mut self, _args: VecDeque<&str>) {
+    fn handle_go_command(&mut self, mut args: VecDeque<&str>) {
         log::debug!("thinking...");
-        let mov = self.engine.get_best_mov().to_string();
-        let msg = format!("bestmove {mov}");
-        self.tx(msg);
+
+        match args.pop_front() {
+            Some("movetime") => {
+                let time_to_sleep: u64 = args.pop_front().unwrap().parse().unwrap();
+                self.curr_think_time = time_to_sleep;
+                std::thread::sleep(Duration::from_millis(self.curr_think_time))
+            }
+            Some("infinite") => {
+                let time_to_sleep: u64 = 5;
+                std::thread::sleep(Duration::from_secs(time_to_sleep));
+            }
+            _ => {}
+        };
+        if let Some(mov) = self.engine.get_best_mov() {
+            let msg = format!("bestmove {mov}");
+            self.tx(msg);
+        }
     }
 
     fn handle_position_command(&mut self, mut cmd: VecDeque<&str>) {
@@ -101,7 +123,7 @@ impl UCI {
             }
         };
 
-        fn add_moves(mut str: VecDeque<&str>) -> VecDeque<ChessMove> {
+        fn parse_moves(mut str: VecDeque<&str>) -> VecDeque<ChessMove> {
             let mut res = VecDeque::new();
             while let Some(mov) = str.pop_front() {
                 let _ = mov
@@ -151,16 +173,16 @@ impl UCI {
                 log::debug!("FEN: {fen}");
                 self.engine = Engine::from_fen(fen);
 
-                let moves = add_moves(cmd);
+                let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
-
+                self.engine = self.engine.get_default_board();
                 self.engine.play_move(moves.into());
             }
             "startpos" => {
                 log::debug!("start position");
-                let moves = add_moves(cmd);
+                let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
-
+                self.engine = self.engine.get_default_board();
                 self.engine.play_move(moves.into());
             }
             _ => {
