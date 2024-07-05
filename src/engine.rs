@@ -11,12 +11,12 @@ pub struct Engine {
     /// index form `current_pos_moves`
     current_best_move: usize,
     depth: u8,
-    white_material: usize,
-    black_material: usize,
+    white_material: u32,
+    black_material: u32,
 }
 
 lazy_static! {
-    static ref PIECE_VALUE: Vec<(chess::Piece, i32)> = vec![
+    static ref PIECE_VALUE: Vec<(chess::Piece, u32)> = vec![
         (chess::Piece::King, 20_000),
         (chess::Piece::Queen, 900),
         (chess::Piece::Rook, 500),
@@ -27,15 +27,32 @@ lazy_static! {
     static ref INITIAL_VALUE: u16 = 23_900;
 }
 struct BoardMaterial {
-    white: usize,
-    black: usize,
+    white: u32,
+    black: u32,
 }
-enum EngineGameState {
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EngineGameState {
     Draw,
     Win,
     Lose,
     Ongoing(isize),
 }
+
+impl EngineGameState {
+    fn to_isize(&self) -> isize {
+        match self {
+            EngineGameState::Draw => 0,
+            EngineGameState::Win => isize::MAX,
+            EngineGameState::Lose => isize::MIN,
+            EngineGameState::Ongoing(eval) => *eval,
+        }
+    }
+    fn is_better(&self, other: &EngineGameState) -> bool {
+        self.to_isize() < other.to_isize()
+    }
+}
+
 impl Engine {
     pub fn new() -> Self {
         let board = Board::default();
@@ -86,8 +103,8 @@ impl Engine {
                     .find(|(p, _)| *p == piece_type)
                     .expect("Imposible");
                 match color {
-                    chess::Color::White => mat.white += *get_piece_worth as usize,
-                    chess::Color::Black => mat.black += *get_piece_worth as usize,
+                    chess::Color::White => mat.white += *get_piece_worth,
+                    chess::Color::Black => mat.black += *get_piece_worth,
                 };
             }
         }
@@ -96,6 +113,10 @@ impl Engine {
 
     fn regen_legal_moves(&mut self) {
         self.current_pos_moves = MoveGen::new_legal(&self.board).collect();
+    }
+
+    fn gen_board_legal_moves(&self, board: &Board) -> Vec<ChessMove> {
+        MoveGen::new_legal(board).collect()
     }
 
     pub fn play_move(&mut self, moves: Vec<ChessMove>) {
@@ -113,33 +134,60 @@ impl Engine {
     }
 
     pub fn get_best_mov(&mut self) -> Option<&ChessMove> {
-        self.current_pos_moves.choose(&mut rand::thread_rng())
+        self.current_pos_moves.get(self.current_best_move)
     }
 
-    fn minimax(
-        &self,
-        board: Board,
+    pub fn search(&mut self, depth: u8) -> EngineGameState {
+        self.search_best_move(depth, &self.board.clone(), self.get_side_to_move())
+    }
+
+    fn search_best_move(
+        &mut self,
         depth: u8,
+        board: &Board,
         player_for: chess::Color,
-        last_move: ChessMove,
-    ) -> ChessMove {
+    ) -> EngineGameState {
         if depth == 0 {
-            return last_move;
-        }
-        if let EngineGameState::Ongoing(eval) = self.eval_current_pos(player_for, board) {
-        } else {
-            return last_move;
+            return self.eval_board(player_for, board);
         }
 
-        todo!()
+        let moves = self.gen_board_legal_moves(board);
+
+        // check if player has no more moves left
+        if moves.is_empty() {
+            // checks if the board is in check
+            if board.checkers().0 != 0 {
+                return EngineGameState::Lose;
+            } else {
+                // draw by stalement
+                return EngineGameState::Draw;
+            }
+        }
+
+        let mut best_eval = if player_for == board.side_to_move() {
+            EngineGameState::Lose
+        } else {
+            EngineGameState::Win
+        };
+        for (idx, mov) in moves.iter().enumerate() {
+            let new_board = board.make_move_new(*mov);
+            let new_eval = self.search_best_move(depth - 1, &new_board, player_for);
+            let is_better = best_eval.is_better(&new_eval);
+            if is_better {
+                self.current_best_move = idx;
+                best_eval = new_eval;
+            }
+        }
+
+        best_eval
     }
 
-    pub fn eval_current_pos(&self, side: chess::Color, board: Board) -> EngineGameState {
+    pub fn eval_board(&self, player_for: chess::Color, board: &Board) -> EngineGameState {
         match board.status() {
             chess::BoardStatus::Ongoing => {}
             chess::BoardStatus::Stalemate => return EngineGameState::Draw,
             chess::BoardStatus::Checkmate => {
-                if side == board.side_to_move() {
+                if player_for == board.side_to_move() {
                     return EngineGameState::Lose;
                 } else {
                     return EngineGameState::Win;
@@ -153,26 +201,78 @@ impl Engine {
         white_weight += mat_count.white;
         black_weight += mat_count.black;
 
-        EngineGameState::Ongoing((white_weight - black_weight).try_into().unwrap())
+        // let final_eval = if player_for == self.board.side_to_move() {
+        //     white_weight as isize - black_weight as isize
+        // } else {
+        //     -(white_weight as isize - black_weight as isize)
+        // };
+
+        let final_eval = if player_for == chess::Color::White {
+            white_weight as isize - black_weight as isize
+        } else {
+            black_weight as isize - white_weight as isize
+        };
+        // if final_eval != 0 {
+        //     println!("{}", final_eval);
+        // }
+
+        EngineGameState::Ongoing(final_eval)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use chess::Board;
+    use std::str::FromStr;
+
+    use chess::ChessMove;
+
+    use crate::engine::EngineGameState;
 
     use super::Engine;
 
     #[test]
     fn test_eval() {
-        let engine = Engine::from_fen("1R1N4/2K1B3/8/4r3/2nk4/8/8/8 w - - 0 1");
+        let engine = Engine::from_fen("8/8/4k3/8/2p5/8/B2P2K1/8 b - - 0 1");
         let board = engine.board;
         if let crate::engine::EngineGameState::Ongoing(eval) =
-            engine.eval_current_pos(chess::Color::White, board)
+            engine.eval_board(chess::Color::White, &board)
         {
             assert_eq!(eval, 300);
         } else {
             panic!("Something went wrong here lol");
+        }
+    }
+
+    #[test]
+    fn test_eval_again() {
+        let mut engine = Engine::from_fen("2r1k3/8/8/5Q2/8/2K5/8/8 w - - 0 1");
+        let board = engine.board;
+        assert_eq!(
+            EngineGameState::Ongoing(400),
+            engine.eval_board(chess::Color::White, &board)
+        );
+        engine.play_move(vec![ChessMove::from_str("f5c8").unwrap()]);
+        assert_eq!(
+            EngineGameState::Ongoing(900),
+            engine.eval_board(chess::Color::White, &board)
+        );
+    }
+
+    #[test]
+    fn test_search() {
+        let mut engine = Engine::from_fen("2r1k3/8/8/5Q2/8/2K5/8/8 w - - 0 1");
+        // match crate::engine::EngineGameState::Ongoing(eval) = engine.search(2) {
+        //     println!("{}", engine.get_best_mov().unwrap());
+        // }
+        //
+        match engine.search(2) {
+            super::EngineGameState::Draw => println!("draw"),
+            super::EngineGameState::Win => println!("WIN"),
+            super::EngineGameState::Lose => println!("LOSE"),
+            super::EngineGameState::Ongoing(eval) => {
+                println!("BEST move: {}", engine.get_best_mov().unwrap());
+                println!("eval: {eval}");
+            }
         }
     }
 }

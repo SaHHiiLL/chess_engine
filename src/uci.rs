@@ -95,17 +95,14 @@ impl UCI {
         log::debug!("thinking...");
 
         match args.pop_front() {
-            Some("movetime") => {
-                let time_to_sleep: u64 = args.pop_front().unwrap().parse().unwrap();
-                self.curr_think_time = time_to_sleep;
-                std::thread::sleep(Duration::from_millis(self.curr_think_time))
-            }
+            Some("movetime") => {}
             Some("infinite") => {
                 let time_to_sleep: u64 = 5;
                 std::thread::sleep(Duration::from_secs(time_to_sleep));
             }
             _ => {}
         };
+        self.engine.search(3);
         if let Some(mov) = self.engine.get_best_mov() {
             let msg = format!("bestmove {mov}");
             self.tx(msg);
