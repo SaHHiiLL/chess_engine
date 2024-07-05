@@ -77,10 +77,12 @@ impl UCI {
     }
 
     fn handle_debug_command(&mut self) {
-        panic!("Really weird");
+        dbg!(self.engine.get_board());
+        dbg!(self.engine.get_side_to_move());
     }
     fn handle_stop_command(&mut self) {
         if let Some(mov) = self.engine.get_best_mov() {
+            self.engine.play_best_move();
             let msg = format!("bestmove {mov}");
             self.tx(msg);
         }
@@ -173,14 +175,14 @@ impl UCI {
                 let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
                 self.engine = self.engine.get_default_board();
-                self.engine.play_move(moves.into());
+                self.engine.play_moves(moves.into());
             }
             "startpos" => {
                 log::debug!("start position");
                 let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
                 self.engine = self.engine.get_default_board();
-                self.engine.play_move(moves.into());
+                self.engine.play_moves(moves.into());
             }
             _ => {
                 log::error!("Invalid args");
