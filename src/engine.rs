@@ -35,6 +35,11 @@ lazy_static! {
         map
     };
     static ref INITIAL_VALUE: u16 = 23_900;
+    static ref KNIGHT_VALUE_PER_SQUARE: Vec<i32> = vec![
+        -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15,
+        10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15,
+        15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
+    ];
 }
 #[derive(Debug)]
 struct BoardMaterial {
@@ -42,7 +47,7 @@ struct BoardMaterial {
     black: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EngineGameState {
     Draw,
     Win,
@@ -59,25 +64,9 @@ impl EngineGameState {
             EngineGameState::Ongoing(eval) => *eval,
         }
     }
-    fn is_better_than(&self, other: &EngineGameState) -> bool {
-        use EngineGameState::*;
-
-        match (self, other) {
-            (Win, _) => true,
-            (_, Win) => false,
-            (Draw, Lose) => true,
-            (Lose, Draw) => false,
-            (Ongoing(score1), Ongoing(score2)) => score1 > score2,
-            (Ongoing(_), Lose) => true,
-            (Lose, Ongoing(_)) => false,
-            (Draw, Draw) => false,
-            (Lose, Lose) => false,
-            (Draw, Ongoing(_)) => false,
-            (Ongoing(_), Draw) => true,
-        }
-    }
+    /// checks if `other` is better than `self`
     fn is_better(&self, other: &EngineGameState) -> bool {
-        self.is_better_than(other)
+        self.to_isize() < other.to_isize()
     }
 }
 
@@ -185,9 +174,25 @@ impl Engine {
     }
 
     pub fn search(&mut self, depth: u8) -> EngineGameState {
-        let board = self.board;
-        self.current_best_move = None;
-        self.search_best_move(depth, &board)
+        // let board = self.board;
+        // self.current_best_move = None;
+        // self.search_best_move(depth, &board)
+
+        let moves = self.gen_board_legal_moves(&self.board);
+        let mut best_eval: EngineGameState = EngineGameState::Lose;
+        let mut best_mov = None;
+
+        for mov in moves.iter() {
+            let new_board = self.board.make_move_new(*mov);
+            let eval = self.search_best_move(depth, &new_board);
+
+            if best_eval.is_better(&eval) {
+                best_eval = eval;
+                let _ = best_mov.insert(*mov);
+            }
+        }
+        self.current_best_move = best_mov;
+        best_eval
     }
 
     fn search_best_move(&mut self, depth: u8, board: &Board) -> EngineGameState {
@@ -207,33 +212,15 @@ impl Engine {
                 return EngineGameState::Draw;
             }
         }
-        let player_for = self.get_side_to_move();
 
-        let mut best_eval = if player_for == board.side_to_move() {
-            EngineGameState::Lose
-        } else {
-            EngineGameState::Win
-        };
-        self.current_best_move = None;
-        for (idx, mov) in moves.iter().enumerate() {
-            let new_board = board.make_move_new(*mov);
-            let new_eval = self.search_best_move(depth - 1, &new_board);
-
-            let is_better = match player_for {
-                // Maximizing player
-                player if player == board.side_to_move() => new_eval.is_better(&best_eval),
-                // Minimizing player
-                _ => best_eval.is_better(&new_eval),
-            };
-
-            if is_better {
-                self.current_best_move = Some(*mov);
-                best_eval = new_eval;
-            }
-        }
+        let mut best_eval = EngineGameState::Lose;
 
         for mov in moves.iter() {
-            println!("{}", mov.to_string());
+            let new_board = board.make_move_new(*mov);
+            let eval = self.search_best_move(depth - 1, &new_board);
+            if best_eval.is_better(&eval) {
+                best_eval = eval;
+            }
         }
 
         best_eval
@@ -258,7 +245,15 @@ impl Engine {
         white_weight += mat_count.white;
         black_weight += mat_count.black;
 
-        let final_eval = white_weight as isize - black_weight as isize;
+        // let mut final_eval = white_weight as isize - black_weight as isize;
+        // if board.side_to_move() != self.get_side_to_move() {
+        //     final_eval = -final_eval;
+        // }
+
+        let final_eval = match board.side_to_move() {
+            chess::Color::White => white_weight as isize - black_weight as isize,
+            chess::Color::Black => black_weight as isize - white_weight as isize,
+        };
 
         EngineGameState::Ongoing(final_eval)
     }
