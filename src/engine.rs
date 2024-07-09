@@ -2,17 +2,13 @@ use std::{collections::HashMap, str::FromStr};
 
 use chess::{Board, ChessMove, MoveGen, Square};
 use lazy_static::lazy_static;
-use rand::seq::SliceRandom;
 
 pub struct Engine {
     board: Board,
-    eval: f64,
     current_pos_moves: Vec<ChessMove>,
     /// index form `current_pos_moves`
     current_best_move: Option<ChessMove>,
-    depth: u8,
-    white_material: u32,
-    black_material: u32,
+    your_side: chess::Color,
 }
 
 lazy_static! {
@@ -35,11 +31,23 @@ lazy_static! {
         map
     };
     static ref INITIAL_VALUE: u16 = 23_900;
-    static ref KNIGHT_VALUE_PER_SQUARE: Vec<i32> = vec![
+    static ref KNIGHT_VALUE_PER_SQUARE_WHITE: Vec<i32> = vec![
         -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15,
         10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15,
         15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
     ];
+    static ref KNIGHT_VALUE_PER_SQUARE_BLACK: Vec<i32> = KNIGHT_VALUE_PER_SQUARE_WHITE
+        .iter()
+        .copied()
+        .rev()
+        .collect::<Vec<i32>>();
+    static ref PAWN_VALUD_PER_SQUARE_WHITE: Vec<i32> = vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, -20, -20, 10, 10, 5, 5, -5, -10, 0, 0, -10, -5, 5, 0, 0,
+        0, 20, 20, 0, 0, 0, 5, 5, 10, 25, 25, 10, 5, 5, 10, 10, 20, 30, 30, 20, 10, 10, 50, 50, 50,
+        50, 50, 50, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0
+    ];
+    static ref PAWN_VALUD_PER_SQUARE_BLACK: Vec<i32> =
+        PAWN_VALUD_PER_SQUARE_WHITE.iter().copied().rev().collect();
 }
 #[derive(Debug)]
 struct BoardMaterial {
@@ -106,12 +114,9 @@ impl Engine {
         let board = Board::default();
         Self {
             board,
-            eval: 0.0,
             current_pos_moves: MoveGen::new_legal(&board).collect(),
             current_best_move: None,
-            depth: 3,
-            white_material: 0,
-            black_material: 0,
+            your_side: chess::Color::White,
         }
     }
 
@@ -120,20 +125,12 @@ impl Engine {
         let board = Board::from_str(&s).unwrap();
 
         // TODO: evaluate the engine
-        let mut engine = Self {
+        Self {
             board,
-            eval: 0.0,
             current_pos_moves: MoveGen::new_legal(&board).collect(),
             current_best_move: None,
-            depth: 3,
-            white_material: 0,
-            black_material: 0,
-        };
-
-        let mat = engine.board.material_sum();
-        engine.white_material = mat.white;
-        engine.black_material = mat.black;
-        engine
+            your_side: board.side_to_move(),
+        }
     }
 
     fn regen_legal_moves(&mut self) {
@@ -156,13 +153,14 @@ impl Engine {
             self.board = self.board.make_move_new(*m);
         }
         self.regen_legal_moves();
+        self.your_side = self.board.side_to_move();
     }
 
     pub fn get_default_board(&self) -> Self {
         Engine::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
     pub fn get_side_to_move(&self) -> chess::Color {
-        self.board.side_to_move()
+        self.your_side
     }
 
     pub fn get_best_mov(&mut self) -> Option<ChessMove> {
@@ -174,17 +172,31 @@ impl Engine {
     }
 
     pub fn search(&mut self, depth: u8) -> EngineGameState {
-        // let board = self.board;
-        // self.current_best_move = None;
-        // self.search_best_move(depth, &board)
-
         let moves = self.gen_board_legal_moves(&self.board);
         let mut best_eval: EngineGameState = EngineGameState::Lose;
         let mut best_mov = None;
 
         for mov in moves.iter() {
+            if mov.to_string().as_str() == "f2g3" {
+                println!("WHAT");
+            }
+
+            let piece = self
+                .board
+                .piece_on(mov.get_source())
+                .expect("Should always have a source");
+
             let new_board = self.board.make_move_new(*mov);
-            let eval = self.search_best_move(depth, &new_board);
+            let mut eval = self.search_best_move(depth, &new_board);
+            match eval {
+                EngineGameState::Ongoing(ref mut e) => {
+                    if chess::Piece::Pawn == piece {
+                        // TODO: make this work
+                    }
+                },
+                _ = {},
+            };
+
 
             if best_eval.is_better(&eval) {
                 best_eval = eval;
@@ -245,16 +257,17 @@ impl Engine {
         white_weight += mat_count.white;
         black_weight += mat_count.black;
 
-        // let mut final_eval = white_weight as isize - black_weight as isize;
-        // if board.side_to_move() != self.get_side_to_move() {
-        //     final_eval = -final_eval;
-        // }
-
         let final_eval = match board.side_to_move() {
-            chess::Color::White => white_weight as isize - black_weight as isize,
-            chess::Color::Black => black_weight as isize - white_weight as isize,
+            chess::Color::White => black_weight as isize - white_weight as isize,
+            chess::Color::Black => white_weight as isize - black_weight as isize,
         };
 
+        // let final_eval = if self.get_side_to_move() != board.side_to_move() {
+        //     -final_eval
+        // } else {
+        //     final_eval
+        // };
+        //
         EngineGameState::Ongoing(final_eval)
     }
 }
@@ -269,6 +282,7 @@ mod tests {
 
     use super::Engine;
 
+    #[test]
     fn test_eval() {
         let engine = Engine::from_fen("8/8/4k3/8/2p5/8/B2P2K1/8 b - - 0 1");
         let board = engine.board;
@@ -286,13 +300,44 @@ mod tests {
     }
 
     #[test]
-    fn test_search() {
-        let mut engine = Engine::from_fen("28/5k2/4b3/2r5/8/4Q3/8/2K5 w - - 0 1");
-        // match crate::engine::EngineGameState::Ongoing(eval) = engine.search(2) {
-        //     println!("{}", engine.get_best_mov().unwrap());
-        // }
-        //
-        match engine.search(1) {
+    fn test_search_default_pos() {
+        let mut engine = Engine::new();
+        match engine.search(3) {
+            super::EngineGameState::Draw => println!("draw"),
+            super::EngineGameState::Win => println!("WIN"),
+            super::EngineGameState::Lose => println!("LOSE"),
+            super::EngineGameState::Ongoing(eval) => {
+                println!("BEST move: {}", engine.get_best_mov().unwrap());
+                println!("eval: {eval}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_best_move_capture_queen() {
+        let mut engine =
+            Engine::from_fen("rn2k1nr/ppp2ppp/8/3pp3/8/P1P3qb/1PQPPP2/RNB1KB2 w Qkq - 0 8");
+        match engine.search(2) {
+            super::EngineGameState::Draw => println!("draw"),
+            super::EngineGameState::Win => println!("WIN"),
+            super::EngineGameState::Lose => println!("LOSE"),
+            super::EngineGameState::Ongoing(eval) => {
+                println!("BEST move: {}", engine.get_best_mov().unwrap());
+                println!("eval: {eval}");
+
+                assert_eq!(
+                    engine.get_best_mov(),
+                    Some(ChessMove::from_str("f2g3").unwrap())
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_search_fen() {
+        let mut engine =
+            Engine::from_fen("rnb1kbnr/pqpppppp/8/1p1N4/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1");
+        match engine.search(2) {
             super::EngineGameState::Draw => println!("draw"),
             super::EngineGameState::Win => println!("WIN"),
             super::EngineGameState::Lose => println!("LOSE"),
