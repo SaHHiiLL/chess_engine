@@ -124,7 +124,6 @@ impl Engine {
         let s = s.to_string();
         let board = Board::from_str(&s).unwrap();
 
-        // TODO: evaluate the engine
         Self {
             board,
             current_pos_moves: MoveGen::new_legal(&board).collect(),
@@ -156,6 +155,13 @@ impl Engine {
         self.your_side = self.board.side_to_move();
     }
 
+    fn play_move_no_side(&mut self, moves: Vec<ChessMove>) {
+        for m in moves.iter() {
+            self.board = self.board.make_move_new(*m);
+        }
+        self.regen_legal_moves();
+    }
+
     pub fn get_default_board(&self) -> Self {
         Engine::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
     }
@@ -174,29 +180,11 @@ impl Engine {
     pub fn search(&mut self, depth: u8) -> EngineGameState {
         let moves = self.gen_board_legal_moves(&self.board);
         let mut best_eval: EngineGameState = EngineGameState::Lose;
-        let mut best_mov = None;
+        let mut best_mov: Option<chess::ChessMove> = None;
 
         for mov in moves.iter() {
-            if mov.to_string().as_str() == "f2g3" {
-                println!("WHAT");
-            }
-
-            let piece = self
-                .board
-                .piece_on(mov.get_source())
-                .expect("Should always have a source");
-
             let new_board = self.board.make_move_new(*mov);
-            let mut eval = self.search_best_move(depth, &new_board);
-            match eval {
-                EngineGameState::Ongoing(ref mut e) => {
-                    if chess::Piece::Pawn == piece {
-                        // TODO: make this work
-                    }
-                },
-                _ = {},
-            };
-
+            let eval = self.search_best_move(depth, &new_board);
 
             if best_eval.is_better(&eval) {
                 best_eval = eval;
@@ -257,17 +245,11 @@ impl Engine {
         white_weight += mat_count.white;
         black_weight += mat_count.black;
 
-        let final_eval = match board.side_to_move() {
-            chess::Color::White => black_weight as isize - white_weight as isize,
-            chess::Color::Black => white_weight as isize - black_weight as isize,
+        let final_eval = match self.get_side_to_move() {
+            chess::Color::White => white_weight as isize - black_weight as isize,
+            chess::Color::Black => black_weight as isize - white_weight as isize,
         };
 
-        // let final_eval = if self.get_side_to_move() != board.side_to_move() {
-        //     -final_eval
-        // } else {
-        //     final_eval
-        // };
-        //
         EngineGameState::Ongoing(final_eval)
     }
 }
@@ -284,19 +266,30 @@ mod tests {
 
     #[test]
     fn test_eval() {
-        let engine = Engine::from_fen("8/8/4k3/8/2p5/8/B2P2K1/8 b - - 0 1");
-        let board = engine.board;
-        if let crate::engine::EngineGameState::Ongoing(eval) = engine.eval_board(&board) {
-            assert_eq!(eval, 300);
-        } else {
-            panic!("Something went wrong here lol");
-        }
+        // Playing as black with a bishop down
+        let mut engine = Engine::from_fen("8/8/4k3/8/2p5/8/B2P2K1/8 b - - 0 1");
+        engine.your_side = chess::Color::Black;
+        assert_eq!(
+            EngineGameState::Ongoing(-3),
+            engine.eval_board(&engine.board)
+        );
 
+        // playign with white with a queen up but black as a rook
         let mut engine = Engine::from_fen("2r1k3/8/8/5Q2/8/2K5/8/8 w - - 0 1");
-        let board = engine.board;
-        assert_eq!(EngineGameState::Ongoing(400), engine.eval_board(&board));
+        // eval board for white
+        engine.your_side = chess::Color::White;
+        assert_eq!(
+            EngineGameState::Ongoing(4),
+            engine.eval_board(&engine.board)
+        );
+
+        // still playing for white but white now captures the rook - that gives white 9+ advantage
         engine.play_moves(vec![ChessMove::from_str("f5c8").unwrap()]);
-        assert_eq!(EngineGameState::Ongoing(900), engine.eval_board(&board));
+        engine.your_side = chess::Color::White;
+        assert_eq!(
+            EngineGameState::Ongoing(9),
+            engine.eval_board(&engine.board)
+        );
     }
 
     #[test]
@@ -326,8 +319,8 @@ mod tests {
                 println!("eval: {eval}");
 
                 assert_eq!(
-                    engine.get_best_mov(),
-                    Some(ChessMove::from_str("f2g3").unwrap())
+                    engine.get_best_mov().unwrap().to_string(),
+                    ChessMove::from_str("f2g3").unwrap().to_string()
                 );
             }
         }
@@ -337,7 +330,7 @@ mod tests {
     fn test_search_fen() {
         let mut engine =
             Engine::from_fen("rnb1kbnr/pqpppppp/8/1p1N4/8/8/PPPPPPPP/R1BQKBNR b KQkq - 0 1");
-        match engine.search(2) {
+        match engine.search(3) {
             super::EngineGameState::Draw => println!("draw"),
             super::EngineGameState::Win => println!("WIN"),
             super::EngineGameState::Lose => println!("LOSE"),
@@ -349,12 +342,33 @@ mod tests {
     }
     #[test]
     fn test_check() {
-        let mut engine =
+        let engine =
             Engine::from_fen("rnb1k1nr/pppp1ppp/8/4p3/7q/RP6/2PPPPPP/1NBQKBNR w Kkq - 0 1");
 
-        let board = engine.board;
-        let moves = engine.gen_board_legal_moves(&board);
+        let moves = engine.gen_board_legal_moves(&engine.board);
 
         dbg!(moves.iter().map(|d| d.to_string()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn test_eval_take_pawn() {
+        let mut engine =
+            Engine::from_fen("1nbqkbnr/1ppppppp/8/8/r1PP4/8/PP2PPPP/R1BQKBNR b KQk - 0 4");
+        engine.your_side = chess::Color::Black;
+        let before_eval = engine.eval_board(&engine.board);
+
+        engine.search(2);
+        engine.play_best_move();
+        let after_eval = engine.eval_board(&engine.board);
+
+        assert_eq!(before_eval, after_eval);
+    }
+
+    #[test]
+    fn test_can_checkmate() {
+        let mut engine = Engine::from_fen("3K4/7r/6r1/1k6/8/8/8/8 b - - 0 1");
+        engine.your_side = chess::Color::Black;
+        let eval = dbg!(engine.search(1));
+        assert_eq!(engine.get_best_mov().unwrap().to_string(), "g6g8");
     }
 }

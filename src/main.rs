@@ -5,7 +5,7 @@ use chrono::Utc;
 use log::{debug, error, LevelFilter};
 
 extern crate chess;
-mod engine;
+mod engine2;
 mod uci;
 
 use std::panic;

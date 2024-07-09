@@ -7,7 +7,7 @@ use std::{
 
 use chess::ChessMove;
 
-use crate::engine::Engine;
+use crate::engine2::Engine;
 
 pub struct UCI {
     engine: Engine,
@@ -76,10 +76,7 @@ impl UCI {
         }
     }
 
-    fn handle_debug_command(&mut self) {
-        dbg!(self.engine.get_board());
-        dbg!(self.engine.get_side_to_move());
-    }
+    fn handle_debug_command(&mut self) {}
     fn handle_stop_command(&mut self) {
         if let Some(mov) = self.engine.get_best_mov() {
             self.engine.play_best_move();
@@ -89,7 +86,7 @@ impl UCI {
     }
 
     fn handle_ucinewgame_command(&mut self) {
-        self.engine = self.engine.get_default_board();
+        self.engine = Engine::new();
         log::debug!("Uci New Game");
     }
 
@@ -170,18 +167,18 @@ impl UCI {
                 }
                 let fen = fen_part.join(" ");
                 log::debug!("FEN: {fen}");
-                self.engine = Engine::from_fen(fen);
+                self.engine = Engine::from_str(&fen).unwrap();
 
                 let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
-                self.engine = self.engine.get_default_board();
+                // self.engine = Engine::new();
                 self.engine.play_moves(moves.into());
             }
             "startpos" => {
                 log::debug!("start position");
                 let moves = parse_moves(cmd);
                 log::debug!("Moves: {moves:?}");
-                self.engine = self.engine.get_default_board();
+                self.engine = Engine::new();
                 self.engine.play_moves(moves.into());
             }
             _ => {
