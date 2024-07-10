@@ -129,33 +129,9 @@ impl UCI {
             res
         }
 
-        let mut last_move = None;
-        let mut last_number = None;
-        if position_type != "fen" && position_type != "startpos" {
-            let _ = ChessMove::from_str(position_type)
-                .map(|d| last_move = Some(d))
-                .map_err(|_| {
-                    let _ = position_type
-                        .parse::<usize>()
-                        .map(|d| last_number = Some(d));
-                });
-            position_type = match cmd.pop_front() {
-                Some(pt) => pt,
-                None => {
-                    log::error!("Expected Args -- found none");
-                    return;
-                }
-            };
-        }
-
         match position_type {
             "fen" => {
                 log::debug!("position command received: parsing fen");
-                let msg = format!(
-                    "current vec: {:?}",
-                    cmd.clone().into_iter().collect::<Vec<_>>()
-                );
-                crate::send_noti(msg);
 
                 let mut fen_part = Vec::new();
                 while let Some(fp) = cmd.pop_front() {
