@@ -83,6 +83,10 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn board(&self) -> &Board {
+        &self.board
+    }
+
     pub fn new() -> Self {
         Self {
             board: Board::default(),
@@ -112,6 +116,23 @@ impl Engine {
         self.side_playing = self.board.side_to_move();
     }
 
+    pub fn search_slow(&mut self, depth: usize) -> isize {
+        let legal_moves = self.gen_legal_moves(&self.board);
+        let mut best_eval = -isize::MAX;
+
+        for m in legal_moves.iter() {
+            // make the move
+            let next_board = self.board.make_move_new(*m);
+            let next_eval = self.search_minimax(depth, &next_board, false);
+
+            if next_eval > best_eval || self.best_move.is_none() {
+                best_eval = next_eval;
+                let _ = self.best_move.insert(*m);
+            }
+        }
+        best_eval
+    }
+
     pub fn search(&mut self, depth: usize) -> isize {
         let legal_moves = self.gen_legal_moves(&self.board);
         let mut best_eval = -isize::MAX;
@@ -122,7 +143,7 @@ impl Engine {
             let next_eval =
                 self.search_alpha_beta(depth, &next_board, -isize::MAX, isize::MAX, false);
 
-            if next_eval > best_eval {
+            if next_eval > best_eval || self.best_move.is_none() {
                 best_eval = next_eval;
                 let _ = self.best_move.insert(*m);
             }
@@ -205,7 +226,7 @@ impl Engine {
         best_eval
     }
 
-    fn eval_board(&self, board: &Board) -> isize {
+    pub fn eval_board(&self, board: &Board) -> isize {
         let mut value_based_on_pos: isize = 0;
         for x in 0..64 {
             let square = unsafe { Square::new(x) };
@@ -240,9 +261,6 @@ impl Engine {
                     Color::White => board_sum.white as isize - board_sum.black as isize,
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
-                if board.checkers().0 != 0 {
-                    eval.saturating_add(10);
-                }
 
                 if board.pinned().0 != 0 {
                     eval.saturating_add(5);
