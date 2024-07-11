@@ -1,13 +1,14 @@
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    str::FromStr,
     time::Duration,
 };
 
+use std::str::FromStr;
+
 use chess::ChessMove;
 
-use crate::engine2::Engine;
+use crate::engine::Engine;
 
 pub struct UCI {
     engine: Engine,
@@ -88,7 +89,7 @@ impl UCI {
             }
             _ => {}
         };
-        self.engine.search(3);
+        self.engine.search(4);
         if let Some(mov) = self.engine.get_best_mov() {
             let msg = format!("bestmove {mov}");
             self.tx(msg);

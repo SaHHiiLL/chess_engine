@@ -1,6 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{cmp::Ordering, collections::HashMap, ptr::eq, str::FromStr};
 
-use chess::{Board, ChessMove, Color, MoveGen, Square};
+use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 lazy_static::lazy_static! {
     static ref PIECE_VALUE_MAP: HashMap<chess::Piece, u32> = {
@@ -82,6 +83,12 @@ pub struct Engine {
     side_playing: chess::Color,
 }
 
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Engine {
     pub fn board(&self) -> &Board {
         &self.board
@@ -97,6 +104,40 @@ impl Engine {
 
     fn gen_legal_moves(&self, board: &Board) -> Vec<ChessMove> {
         MoveGen::new_legal(board).collect()
+    }
+
+    /// Sorts moves based on if the move captures a piece or does a promotion
+    /// if a move is a capture or promotion it will be send higher in the list
+    /// this will help the `alpha-beta` pruning
+    fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove]) {
+        moves.sort_by(|d: &ChessMove, other: &ChessMove| {
+            let square: Square = d.get_dest();
+            let piece = board.piece_on(square);
+
+            let square_other: Square = other.get_dest();
+            let piece_other = board.piece_on(square_other);
+
+            if piece.is_some() && piece_other.is_some() {
+                return Ordering::Equal;
+            }
+
+            if piece.is_some() {
+                return Ordering::Less;
+            }
+
+            if piece_other.is_some() {
+                return Ordering::Greater;
+            }
+
+            if d.get_promotion().is_some() {
+                return Ordering::Less;
+            }
+            if other.get_promotion().is_some() {
+                return Ordering::Greater;
+            }
+
+            Ordering::Equal
+        });
     }
 
     pub fn get_best_mov(&self) -> Option<ChessMove> {
@@ -168,8 +209,11 @@ impl Engine {
         } else {
             isize::MAX
         };
-        let moves = self.gen_legal_moves(board);
-
+        // Move Ordering based on -- if a piece can be captured from the move it can be a good move
+        // thus should be looked before
+        let mut moves = self.gen_legal_moves(board);
+        self.sort_moves_in_place(board, &mut moves);
+        let moves = moves;
         if moves.is_empty() {
             return self.eval_board(board);
         }
@@ -206,6 +250,7 @@ impl Engine {
         } else {
             isize::MAX
         };
+
         let moves = self.gen_legal_moves(board);
 
         if moves.is_empty() {
@@ -224,6 +269,58 @@ impl Engine {
             }
         }
         best_eval
+    }
+
+    pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {
+        let default_squares: Vec<Square> = match piece {
+            Piece::Knight => match color {
+                Color::White => vec![
+                    Square::from_str("b1").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("g1").expect("IS A CORRECT SQUARE"),
+                ],
+                Color::Black => vec![
+                    Square::from_str("b8").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("g8").expect("IS A CORRECT SQUARE"),
+                ],
+            },
+            Piece::Bishop => match color {
+                Color::White => vec![
+                    Square::from_str("c1").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("f1").expect("IS A CORRECT SQUARE"),
+                ],
+                Color::Black => vec![
+                    Square::from_str("c8").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("f8").expect("IS A CORRECT SQUARE"),
+                ],
+            },
+
+            Piece::Rook => match color {
+                Color::White => vec![
+                    Square::from_str("a1").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("h1").expect("IS A CORRECT SQUARE"),
+                ],
+                Color::Black => vec![
+                    Square::from_str("a8").expect("IS A CORRECT SQUARE"),
+                    Square::from_str("h8").expect("IS A CORRECT SQUARE"),
+                ],
+            },
+            Piece::King => match color {
+                Color::White => vec![Square::from_str("e1").expect("IS A CORRECT SQUARE")],
+                Color::Black => vec![Square::from_str("e8").expect("IS A CORRECT SQUARE")],
+            },
+            Piece::Queen => match color {
+                Color::White => vec![Square::from_str("d1").expect("IS A CORRECT SQUARE")],
+                Color::Black => vec![Square::from_str("d8").expect("IS A CORRECT SQUARE")],
+            },
+            _ => return false,
+        };
+
+        for sq in default_squares.iter() {
+            if sq.eq(square) {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn eval_board(&self, board: &Board) -> isize {
@@ -251,19 +348,24 @@ impl Engine {
                 };
 
                 value_based_on_pos += piece_value;
+
+                if self.is_piece_on_original_pos(&piece, &square, &color) {
+                    // decrease the evals - to encourage it to move pieces forward
+                    value_based_on_pos = value_based_on_pos.saturating_sub(10);
+                }
             }
         }
 
         let mat_val = match board.status() {
             chess::BoardStatus::Ongoing => {
                 let board_sum = board.material_sum();
-                let eval = match board.side_to_move() {
+                let mut eval = match board.side_to_move() {
                     Color::White => board_sum.white as isize - board_sum.black as isize,
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
 
                 if board.pinned().0 != 0 {
-                    eval.saturating_add(5);
+                    eval = eval.saturating_add(5);
                 }
 
                 if board.side_to_move() != self.board.side_to_move() {

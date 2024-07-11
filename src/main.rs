@@ -1,5 +1,5 @@
 extern crate chess;
-mod engine2;
+mod engine;
 mod uci;
 
 use std::panic;
