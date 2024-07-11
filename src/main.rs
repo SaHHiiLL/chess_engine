@@ -86,7 +86,7 @@ fn main() {
         //     .init();
         // debug!("Starting Engine");
 
-        send_noti("Engine Started asjh");
+        send_noti("Engine Started alpha beta");
 
         let mut uci = uci::UCI::new();
         uci.rx();

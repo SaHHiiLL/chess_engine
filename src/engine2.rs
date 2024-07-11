@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Square};
+use chess::{Board, ChessMove, Color, MoveGen, Square};
 
 lazy_static::lazy_static! {
     static ref PIECE_VALUE_MAP: HashMap<chess::Piece, u32> = {
@@ -9,7 +9,7 @@ lazy_static::lazy_static! {
         map.insert(chess::Piece::Queen, 900);
         map.insert(chess::Piece::Rook, 500);
         map.insert(chess::Piece::Knight, 300);
-        map.insert(chess::Piece::Bishop, 325);
+        map.insert(chess::Piece::Bishop, 330);
         map.insert(chess::Piece::Pawn, 100);
         map
     };
@@ -40,7 +40,7 @@ lazy_static::lazy_static! {
 -10,  5,  5, 10, 10,  5,  5,-10,
 -10,  0, 10, 10, 10, 10,  0,-10,
 -10, 10, 10, 10, 10, 10, 10,-10,
--10,  5,  0,  0,  0,  0,  5,-10,
+-10,  20,  0,  0,  0,  0,  20,-10,
 -20,-10,-10,-10,-10,-10,-10,-20,
     ];
     static ref BISHOP_VALUE_PER_SQUARE_BLACK: Vec<isize> = BISHOP_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
@@ -119,7 +119,8 @@ impl Engine {
         for m in legal_moves.iter() {
             // make the move
             let next_board = self.board.make_move_new(*m);
-            let next_eval = self.search_further(depth, &next_board, false);
+            let next_eval =
+                self.search_alpha_beta(depth, &next_board, -isize::MAX, isize::MAX, false);
 
             if next_eval > best_eval {
                 best_eval = next_eval;
@@ -129,7 +130,14 @@ impl Engine {
         best_eval
     }
 
-    fn search_further(&mut self, depth: usize, board: &Board, is_maximizing: bool) -> isize {
+    fn search_alpha_beta(
+        &mut self,
+        depth: usize,
+        board: &Board,
+        mut alpha: isize,
+        mut beta: isize,
+        is_maximizing: bool,
+    ) -> isize {
         if depth == 0 {
             return self.eval_board(board);
         }
@@ -148,7 +156,45 @@ impl Engine {
         for m in moves.iter() {
             // make the move
             let next_board = board.make_move_new(*m);
-            let next_eval = self.search_further(depth - 1, &next_board, !is_maximizing);
+            let eval = self.search_alpha_beta(depth - 1, &next_board, alpha, beta, !is_maximizing);
+
+            if is_maximizing {
+                best_eval = best_eval.max(eval);
+                alpha = alpha.max(eval);
+                if beta <= alpha {
+                    break;
+                }
+            } else {
+                best_eval = best_eval.min(eval);
+                beta = beta.min(eval);
+                if beta <= alpha {
+                    break;
+                }
+            }
+        }
+        best_eval
+    }
+
+    fn search_minimax(&mut self, depth: usize, board: &Board, is_maximizing: bool) -> isize {
+        if depth == 0 {
+            return self.eval_board(board);
+        }
+
+        let mut best_eval = if is_maximizing {
+            -isize::MAX
+        } else {
+            isize::MAX
+        };
+        let moves = self.gen_legal_moves(board);
+
+        if moves.is_empty() {
+            return self.eval_board(board);
+        }
+
+        for m in moves.iter() {
+            // make the move
+            let next_board = board.make_move_new(*m);
+            let next_eval = self.search_minimax(depth - 1, &next_board, !is_maximizing);
 
             if is_maximizing {
                 best_eval = best_eval.max(next_eval);
@@ -194,6 +240,13 @@ impl Engine {
                     Color::White => board_sum.white as isize - board_sum.black as isize,
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
+                if board.checkers().0 != 0 {
+                    eval.saturating_add(10);
+                }
+
+                if board.pinned().0 != 0 {
+                    eval.saturating_add(5);
+                }
 
                 if board.side_to_move() != self.board.side_to_move() {
                     -eval
