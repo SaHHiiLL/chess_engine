@@ -39,15 +39,6 @@ impl UCI {
                         continue;
                     }
 
-                    log::debug!(
-                        "Message Received: `{cmd}` args: {}",
-                        input
-                            .iter()
-                            .map(|d| d.to_string())
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    );
-
                     match cmd {
                         "uci" => {
                             self.tx("id name NotSoBrightBot");
@@ -66,7 +57,6 @@ impl UCI {
                         " " => {}
                         _ => {
                             let input = input.into_iter().collect::<Vec<_>>().join(" ");
-                            log::error!("Unknown Command: `{cmd}` -- args: `{input}`");
                         }
                     }
                 }
@@ -87,12 +77,9 @@ impl UCI {
 
     fn handle_ucinewgame_command(&mut self) {
         self.engine = Engine::new();
-        log::debug!("Uci New Game");
     }
 
     fn handle_go_command(&mut self, mut args: VecDeque<&str>) {
-        log::debug!("thinking...");
-
         match args.pop_front() {
             Some("movetime") => {}
             Some("infinite") => {
@@ -109,12 +96,9 @@ impl UCI {
     }
 
     fn handle_position_command(&mut self, mut cmd: VecDeque<&str>) {
-        log::debug!("Handling position command");
-
         let mut position_type = match cmd.pop_front() {
             Some(pt) => pt,
             None => {
-                log::error!("Expected Args -- found none");
                 return;
             }
         };
@@ -131,8 +115,6 @@ impl UCI {
 
         match position_type {
             "fen" => {
-                log::debug!("position command received: parsing fen");
-
                 let mut fen_part = Vec::new();
                 while let Some(fp) = cmd.pop_front() {
                     if fp == "moves" {
@@ -142,32 +124,25 @@ impl UCI {
                     }
                 }
                 let fen = fen_part.join(" ");
-                log::debug!("FEN: {fen}");
                 self.engine = Engine::from_str(&fen).unwrap();
 
                 let moves = parse_moves(cmd);
-                log::debug!("Moves: {moves:?}");
                 // self.engine = Engine::new();
                 self.engine.play_moves(moves.into());
             }
             "startpos" => {
-                log::debug!("start position");
                 let moves = parse_moves(cmd);
-                log::debug!("Moves: {moves:?}");
                 self.engine = Engine::new();
                 self.engine.play_moves(moves.into());
             }
             _ => {
-                log::error!("Invalid args");
                 let msg = "invalid args";
-                crate::send_noti(msg);
             }
         };
     }
 
     fn tx<S: ToString>(&self, msg: S) {
         let msg = msg.to_string();
-        log::debug!("Sending Message: {msg}");
         println!("{msg}");
     }
 }
