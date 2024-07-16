@@ -17,9 +17,14 @@ lazy_static::lazy_static! {
     static ref INITIAL_VALUE: u16 = 23_900;
     static ref CHECKMATE_VALUE: isize = 23_900 * 2;
     static ref KNIGHT_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15,
-        10, 0, -30, -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15,
-        15, 10, 5, -30, -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20
     ];
     static ref KNIGHT_VALUE_PER_SQUARE_BLACK: Vec<isize> = KNIGHT_VALUE_PER_SQUARE_WHITE
         .iter()
@@ -27,24 +32,70 @@ lazy_static::lazy_static! {
         .rev()
         .collect();
     static ref PAWN_VALUD_PER_SQUARE_WHITE: Vec<isize> = vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, -20, -20, 10, 10, 5, 5, -5, -10, 0, 0, -10, -5, 5, 0, 0,
-        0, 20, 20, 0, 0, 0, 5, 5, 10, 25, 25, 10, 5, 5, 10, 10, 20, 30, 30, 20, 10, 10, 50, 50, 50,
-        50, 50, 50, 50, 50, 0, 0, 0, 0, 0, 0, 0, 0
+         0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         5, -5,-10,  0,  0,-10, -5,  5,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
     ];
     static ref PAWN_VALUD_PER_SQUARE_BLACK: Vec<isize> =
         PAWN_VALUD_PER_SQUARE_WHITE.iter().copied().rev().collect();
 
     static ref BISHOP_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
--20,-10,-10,-10,-10,-10,-10,-20,
--10,  0,  0,  0,  0,  0,  0,-10,
--10,  0,  5, 10, 10,  5,  0,-10,
--10,  5,  5, 10, 10,  5,  5,-10,
--10,  0, 10, 10, 10, 10,  0,-10,
--10, 10, 10, 10, 10, 10, 10,-10,
--10,  20,  0,  0,  0,  0,  20,-10,
--20,-10,-10,-10,-10,-10,-10,-20,
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  20,  0,  0,  0,  0,  20,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20,
     ];
     static ref BISHOP_VALUE_PER_SQUARE_BLACK: Vec<isize> = BISHOP_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
+
+
+    static ref KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE: Vec<isize> = vec![
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20
+    ];
+
+    static ref KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK: Vec<isize> = KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE
+        .iter().copied().rev().collect();
+
+    static ref QUEEN_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
+        -20,-10,-10, -5, -5,-10,-10,-20,
+-10,  0,  0,  0,  0,  0,  0,-10,
+-10,  0,  5,  5,  5,  5,  0,-10,
+ -5,  0,  5,  5,  5,  5,  0, -5,
+  0,  0,  5,  5,  5,  5,  0, -5,
+-10,  5,  5,  5,  5,  5,  0,-10,
+-10,  0,  5,  0,  0,  0,  0,-10,
+-20,-10,-10, -5, -5,-10,-10,-20
+    ];
+
+    static ref QUEEN_VALUE_PER_SQUARE_BLACK: Vec<isize> = QUEEN_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
+
+    static ref ROOK_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
+          0,  0,  0,  0,  0,  0,  0,  0,
+  5, 10, 10, 10, 10, 10, 10,  5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+  0,  0,  0,  5,  5,  0,  0,  0
+    ];
+
+    static ref ROOK_VALUE_PER_SQUARE_BLACK: Vec<isize> = ROOK_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
 }
 
 struct BoardMaterial {
@@ -52,11 +103,33 @@ struct BoardMaterial {
     black: u32,
 }
 
-trait MaterialSum {
+enum GamePhases {
+    Opening,
+    MiddleGame,
+    EndGame,
+}
+
+impl GamePhases {
+    fn from_material_count(white_material: usize, black_material: usize) -> Self {
+        todo!()
+    }
+}
+
+trait IsCaptureMoveExt {
+    fn is_capture_move(&self, chess_move: ChessMove) -> bool;
+}
+
+impl IsCaptureMoveExt for chess::Board {
+    fn is_capture_move(&self, chess_move: ChessMove) -> bool {
+        self.piece_on(chess_move.get_dest()).is_some()
+    }
+}
+
+trait MaterialSumExt {
     fn material_sum(&self) -> BoardMaterial;
 }
 
-impl MaterialSum for chess::Board {
+impl MaterialSumExt for chess::Board {
     fn material_sum(&self) -> BoardMaterial {
         let mut mat = BoardMaterial { white: 0, black: 0 };
         for sq in 0..64 {
@@ -81,11 +154,26 @@ pub struct Engine {
     board: Board,
     best_move: Option<ChessMove>,
     side_playing: chess::Color,
+    board_history: Vec<u64>,
 }
 
 impl Default for Engine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl FromStr for Engine {
+    type Err = chess::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let board = Board::from_str(s)?;
+        Ok(Self {
+            board,
+            best_move: None,
+            side_playing: board.side_to_move(),
+            board_history: vec![],
+        })
     }
 }
 
@@ -99,6 +187,7 @@ impl Engine {
             board: Board::default(),
             best_move: None,
             side_playing: chess::Color::White,
+            board_history: vec![],
         }
     }
 
@@ -147,12 +236,15 @@ impl Engine {
     pub fn play_best_move(&mut self) {
         if let Some(mov) = self.best_move {
             self.board = self.board.make_move_new(mov);
+            self.board_history.clear();
         };
     }
 
     pub fn play_moves(&mut self, moves: Vec<ChessMove>) {
         for m in moves.iter() {
-            self.board = self.board.make_move_new(*m);
+            let board = self.board.make_move_new(*m);
+            self.board = board;
+            self.board_history.push(board.get_hash());
         }
         self.side_playing = self.board.side_to_move();
     }
@@ -242,7 +334,11 @@ impl Engine {
 
     fn search_minimax(&mut self, depth: usize, board: &Board, is_maximizing: bool) -> isize {
         if depth == 0 {
-            return self.eval_board(board);
+            if board.checkers().0 != 0 {
+                return self.search_minimax(depth + 1, board, !is_maximizing);
+            } else {
+                return self.eval(board);
+            }
         }
 
         let mut best_eval = if is_maximizing {
@@ -308,10 +404,10 @@ impl Engine {
                 Color::White => vec![Square::from_str("e1").expect("IS A CORRECT SQUARE")],
                 Color::Black => vec![Square::from_str("e8").expect("IS A CORRECT SQUARE")],
             },
-            Piece::Queen => match color {
-                Color::White => vec![Square::from_str("d1").expect("IS A CORRECT SQUARE")],
-                Color::Black => vec![Square::from_str("d8").expect("IS A CORRECT SQUARE")],
-            },
+            // Piece::Queen => match color {
+            //     Color::White => vec![Square::from_str("d1").expect("IS A CORRECT SQUARE")],
+            //     Color::Black => vec![Square::from_str("d8").expect("IS A CORRECT SQUARE")],
+            // },
             _ => return false,
         };
 
@@ -323,7 +419,34 @@ impl Engine {
         false
     }
 
+    fn rocks_on_same_rank_or_file(&self, board: &Board) -> isize {
+        todo!()
+    }
+
+    fn eval_mobility(&self, moves: &[ChessMove]) -> isize {
+        moves.len().saturating_mul(2).try_into().unwrap()
+    }
+
+    pub fn eval(&self, board: &Board) -> isize {
+        let moves = self.gen_legal_moves(board);
+        self.eval_board(board)
+            .saturating_add(self.eval_mobility(&moves))
+    }
+
     pub fn eval_board(&self, board: &Board) -> isize {
+        // if the position has been reached before at least 3 times it will be draw by three-fold
+        // repetition
+        let repeat_board = self
+            .board_history
+            .iter()
+            .filter(|d| **d == board.get_hash())
+            .count();
+
+        if repeat_board > 2 {
+            println!("REPEAT BOARD -> {repeat_board}");
+            return 0;
+        }
+
         let mut value_based_on_pos: isize = 0;
         for x in 0..64 {
             let square = unsafe { Square::new(x) };
@@ -344,14 +467,25 @@ impl Engine {
                         Color::White => BISHOP_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => BISHOP_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    _ => 0,
+                    chess::Piece::King => match color {
+                        Color::White => KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE[x as usize],
+                        Color::Black => KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK[x as usize],
+                    },
+                    chess::Piece::Rook => match color {
+                        Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
+                    },
+                    chess::Piece::Queen => match color {
+                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
+                    },
                 };
 
                 value_based_on_pos += piece_value;
 
                 if self.is_piece_on_original_pos(&piece, &square, &color) {
                     // decrease the evals - to encourage it to move pieces forward
-                    value_based_on_pos = value_based_on_pos.saturating_sub(10);
+                    value_based_on_pos = value_based_on_pos.saturating_sub(5);
                 }
             }
         }
@@ -359,14 +493,10 @@ impl Engine {
         let mat_val = match board.status() {
             chess::BoardStatus::Ongoing => {
                 let board_sum = board.material_sum();
-                let mut eval = match board.side_to_move() {
+                let eval = match board.side_to_move() {
                     Color::White => board_sum.white as isize - board_sum.black as isize,
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
-
-                if board.pinned().0 != 0 {
-                    eval = eval.saturating_add(5);
-                }
 
                 if board.side_to_move() != self.board.side_to_move() {
                     -eval
@@ -383,21 +513,7 @@ impl Engine {
                 }
             }
         };
-
         mat_val.saturating_add(value_based_on_pos)
-    }
-}
-
-impl FromStr for Engine {
-    type Err = chess::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let board = Board::from_str(s)?;
-        Ok(Self {
-            board,
-            best_move: None,
-            side_playing: board.side_to_move(),
-        })
     }
 }
 
@@ -446,5 +562,10 @@ mod test {
             Engine::from_str("1nbqkbnr/1ppppppp/8/8/r1PP4/8/PP2PPPP/R1BQKBNR b KQk - 0 1").unwrap();
         let eval = engine.search(1);
         assert_eq!(engine.get_best_mov().unwrap().to_string().as_str(), "a4c4");
+    }
+
+    #[test]
+    fn test_move_repetition() {
+        let mut engine = Engine::new();
     }
 }

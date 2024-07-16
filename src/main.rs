@@ -1,5 +1,7 @@
 extern crate chess;
 mod engine;
+mod evaluation;
+mod opening;
 mod uci;
 
 use std::panic;

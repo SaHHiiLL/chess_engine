@@ -93,6 +93,8 @@ impl UCI {
         if let Some(mov) = self.engine.get_best_mov() {
             let msg = format!("bestmove {mov}");
             self.tx(msg);
+            let msg = format!("info pv {mov}");
+            self.tx(msg);
         }
     }
 
