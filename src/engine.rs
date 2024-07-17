@@ -1,106 +1,18 @@
-use std::{cmp::Ordering, collections::HashMap, ptr::eq, str::FromStr};
+use std::{cmp::Ordering, str::FromStr};
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-lazy_static::lazy_static! {
-    static ref PIECE_VALUE_MAP: HashMap<chess::Piece, u32> = {
-        let mut map = HashMap::new();
-        map.insert(chess::Piece::King, 20_000);
-        map.insert(chess::Piece::Queen, 900);
-        map.insert(chess::Piece::Rook, 500);
-        map.insert(chess::Piece::Knight, 300);
-        map.insert(chess::Piece::Bishop, 330);
-        map.insert(chess::Piece::Pawn, 100);
-        map
-    };
-    static ref INITIAL_VALUE: u16 = 23_900;
-    static ref CHECKMATE_VALUE: isize = 23_900 * 2;
-    static ref KNIGHT_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -20,-30,-30,-40,-40,-30,-30,-20,
-        -10,-20,-20,-20,-20,-20,-20,-10,
-         20, 20,  0,  0,  0,  0, 20, 20,
-         20, 30, 10,  0,  0, 10, 30, 20
-    ];
-    static ref KNIGHT_VALUE_PER_SQUARE_BLACK: Vec<isize> = KNIGHT_VALUE_PER_SQUARE_WHITE
-        .iter()
-        .copied()
-        .rev()
-        .collect();
-    static ref PAWN_VALUD_PER_SQUARE_WHITE: Vec<isize> = vec![
-         0,  0,  0,  0,  0,  0,  0,  0,
-        50, 50, 50, 50, 50, 50, 50, 50,
-        10, 10, 20, 30, 30, 20, 10, 10,
-         5,  5, 10, 25, 25, 10,  5,  5,
-         0,  0,  0, 20, 20,  0,  0,  0,
-         5, -5,-10,  0,  0,-10, -5,  5,
-         5, 10, 10,-20,-20, 10, 10,  5,
-         0,  0,  0,  0,  0,  0,  0,  0
-    ];
-    static ref PAWN_VALUD_PER_SQUARE_BLACK: Vec<isize> =
-        PAWN_VALUD_PER_SQUARE_WHITE.iter().copied().rev().collect();
+use crate::consts::{
+    BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE,
+    KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK, KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE,
+    KNIGHT_VALUE_PER_SQUARE_BLACK, KNIGHT_VALUE_PER_SQUARE_WHITE, PAWN_VALUE_PER_SQUARE_BLACK,
+    PAWN_VALUE_PER_SQUARE_WHITE, PIECE_VALUE_MAP, QUEEN_VALUE_PER_SQUARE_BLACK,
+    QUEEN_VALUE_PER_SQUARE_WHITE, ROOK_VALUE_PER_SQUARE_BLACK, ROOK_VALUE_PER_SQUARE_WHITE,
+};
 
-    static ref BISHOP_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -20,-10,-10,-10,-10,-10,-10,-20,
-        -10,  0,  0,  0,  0,  0,  0,-10,
-        -10,  0,  5, 10, 10,  5,  0,-10,
-        -10,  5,  5, 10, 10,  5,  5,-10,
-        -10,  0, 10, 10, 10, 10,  0,-10,
-        -10, 10, 10, 10, 10, 10, 10,-10,
-        -10,  20,  0,  0,  0,  0,  20,-10,
-        -20,-10,-10,-10,-10,-10,-10,-20,
-    ];
-    static ref BISHOP_VALUE_PER_SQUARE_BLACK: Vec<isize> = BISHOP_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
-
-
-    static ref KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE: Vec<isize> = vec![
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -20,-30,-30,-40,-40,-30,-30,-20,
-        -10,-20,-20,-20,-20,-20,-20,-10,
-         20, 20,  0,  0,  0,  0, 20, 20,
-         20, 30, 10,  0,  0, 10, 30, 20
-    ];
-
-    static ref KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK: Vec<isize> = KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE
-        .iter().copied().rev().collect();
-
-    static ref QUEEN_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -20,-10,-10, -5, -5,-10,-10,-20,
--10,  0,  0,  0,  0,  0,  0,-10,
--10,  0,  5,  5,  5,  5,  0,-10,
- -5,  0,  5,  5,  5,  5,  0, -5,
-  0,  0,  5,  5,  5,  5,  0, -5,
--10,  5,  5,  5,  5,  5,  0,-10,
--10,  0,  5,  0,  0,  0,  0,-10,
--20,-10,-10, -5, -5,-10,-10,-20
-    ];
-
-    static ref QUEEN_VALUE_PER_SQUARE_BLACK: Vec<isize> = QUEEN_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
-
-    static ref ROOK_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-          0,  0,  0,  0,  0,  0,  0,  0,
-  5, 10, 10, 10, 10, 10, 10,  5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
-  0,  0,  0,  5,  5,  0,  0,  0
-    ];
-
-    static ref ROOK_VALUE_PER_SQUARE_BLACK: Vec<isize> = ROOK_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
-}
-
-struct BoardMaterial {
-    white: u32,
-    black: u32,
+pub struct BoardMaterial {
+    pub white: u32,
+    pub black: u32,
 }
 
 enum GamePhases {
@@ -125,8 +37,9 @@ impl IsCaptureMoveExt for chess::Board {
     }
 }
 
-trait MaterialSumExt {
+pub trait MaterialSumExt {
     fn material_sum(&self) -> BoardMaterial;
+    fn material_sum_bitboard(&self) -> BoardMaterial;
 }
 
 impl MaterialSumExt for chess::Board {
@@ -145,6 +58,32 @@ impl MaterialSumExt for chess::Board {
                     chess::Color::Black => mat.black += *p,
                 };
             }
+        }
+        mat
+    }
+
+    fn material_sum_bitboard(&self) -> BoardMaterial {
+        let mut mat = BoardMaterial { white: 0, black: 0 };
+        let board: &Board = self;
+        let pieces = &[
+            chess::Piece::Pawn,
+            chess::Piece::Bishop,
+            chess::Piece::Knight,
+            chess::Piece::King,
+            chess::Piece::Queen,
+            chess::Piece::Rook,
+        ];
+
+        let white_bitboard = board.color_combined(Color::White);
+        let black_bitboard = board.color_combined(Color::Black);
+
+        for p in pieces.iter() {
+            let piece_bitboard = board.pieces(*p);
+            let white_piece = piece_bitboard & white_bitboard;
+            let black_piece = piece_bitboard & black_bitboard;
+            let piece_value = PIECE_VALUE_MAP.get(p).expect("YOU IDIOT");
+            mat.white += white_piece.0.count_ones() * piece_value;
+            mat.black += black_piece.0.count_ones() * piece_value;
         }
         mat
     }
@@ -456,8 +395,8 @@ impl Engine {
             if let (Some(piece), Some(color)) = (piece, color) {
                 let piece_value = match piece {
                     chess::Piece::Pawn => match color {
-                        Color::White => PAWN_VALUD_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => PAWN_VALUD_PER_SQUARE_BLACK[x as usize],
+                        Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
                     chess::Piece::Knight => match color {
                         Color::White => KNIGHT_VALUE_PER_SQUARE_WHITE[x as usize],
@@ -492,7 +431,7 @@ impl Engine {
 
         let mat_val = match board.status() {
             chess::BoardStatus::Ongoing => {
-                let board_sum = board.material_sum();
+                let board_sum = board.material_sum_bitboard();
                 let eval = match board.side_to_move() {
                     Color::White => board_sum.white as isize - board_sum.black as isize,
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
@@ -521,7 +460,7 @@ impl Engine {
 mod test {
     use std::str::FromStr;
 
-    use super::Engine;
+    use super::{Engine, MaterialSumExt};
 
     #[test]
     fn best_move_checkmate() {
@@ -567,5 +506,12 @@ mod test {
     #[test]
     fn test_move_repetition() {
         let mut engine = Engine::new();
+    }
+
+    #[test]
+    fn test_material_bitboard_sum() {
+        let engine = Engine::new();
+        let mat = engine.board.material_sum_bitboard();
+        assert_eq!(mat.white, mat.black);
     }
 }
