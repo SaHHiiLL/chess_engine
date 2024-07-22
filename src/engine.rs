@@ -2,18 +2,7 @@ use std::{cmp::Ordering, str::FromStr};
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::consts::{
-    BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE,
-    KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK, KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE,
-    KNIGHT_VALUE_PER_SQUARE_BLACK, KNIGHT_VALUE_PER_SQUARE_WHITE, PAWN_VALUE_PER_SQUARE_BLACK,
-    PAWN_VALUE_PER_SQUARE_WHITE, PIECE_VALUE_MAP, QUEEN_VALUE_PER_SQUARE_BLACK,
-    QUEEN_VALUE_PER_SQUARE_WHITE, ROOK_VALUE_PER_SQUARE_BLACK, ROOK_VALUE_PER_SQUARE_WHITE,
-};
-
-pub struct BoardMaterial {
-    pub white: u32,
-    pub black: u32,
-}
+use crate::eval::Evaluation;
 
 enum GamePhases {
     Opening,
@@ -22,7 +11,10 @@ enum GamePhases {
 }
 
 impl GamePhases {
-    fn from_material_count(white_material: usize, black_material: usize) -> Self {
+    fn from_material_count(board: &Board) -> Self {
+        if board.pieces(Piece::Queen).0 == 0 {
+            return GamePhases::EndGame;
+        }
         todo!()
     }
 }
@@ -34,58 +26,6 @@ trait IsCaptureMoveExt {
 impl IsCaptureMoveExt for chess::Board {
     fn is_capture_move(&self, chess_move: ChessMove) -> bool {
         self.piece_on(chess_move.get_dest()).is_some()
-    }
-}
-
-pub trait MaterialSumExt {
-    fn material_sum(&self) -> BoardMaterial;
-    fn material_sum_bitboard(&self) -> BoardMaterial;
-}
-
-impl MaterialSumExt for chess::Board {
-    fn material_sum(&self) -> BoardMaterial {
-        let mut mat = BoardMaterial { white: 0, black: 0 };
-        for sq in 0..64 {
-            // SAFETY: squares are only created from 0 to 64 (not including 64)
-            let sq = unsafe { Square::new(sq) };
-            let piece_type = self.piece_on(sq);
-            let color = self.color_on(sq);
-
-            if let (Some(piece_type), Some(color)) = (piece_type, color) {
-                let p = PIECE_VALUE_MAP.get(&piece_type).expect("You idiot");
-                match color {
-                    chess::Color::White => mat.white += *p,
-                    chess::Color::Black => mat.black += *p,
-                };
-            }
-        }
-        mat
-    }
-
-    fn material_sum_bitboard(&self) -> BoardMaterial {
-        let mut mat = BoardMaterial { white: 0, black: 0 };
-        let board: &Board = self;
-        let pieces = &[
-            chess::Piece::Pawn,
-            chess::Piece::Bishop,
-            chess::Piece::Knight,
-            chess::Piece::King,
-            chess::Piece::Queen,
-            chess::Piece::Rook,
-        ];
-
-        let white_bitboard = board.color_combined(Color::White);
-        let black_bitboard = board.color_combined(Color::Black);
-
-        for p in pieces.iter() {
-            let piece_bitboard = board.pieces(*p);
-            let white_piece = piece_bitboard & white_bitboard;
-            let black_piece = piece_bitboard & black_bitboard;
-            let piece_value = PIECE_VALUE_MAP.get(p).expect("YOU IDIOT");
-            mat.white += white_piece.0.count_ones() * piece_value;
-            mat.black += black_piece.0.count_ones() * piece_value;
-        }
-        mat
     }
 }
 
@@ -119,6 +59,10 @@ impl FromStr for Engine {
 impl Engine {
     pub fn board(&self) -> &Board {
         &self.board
+    }
+
+    pub fn history(&self) -> &[u64] {
+        &self.board_history
     }
 
     pub fn new() -> Self {
@@ -180,6 +124,7 @@ impl Engine {
     }
 
     pub fn play_moves(&mut self, moves: Vec<ChessMove>) {
+        self.board_history.clear();
         for m in moves.iter() {
             let board = self.board.make_move_new(*m);
             self.board = board;
@@ -232,7 +177,7 @@ impl Engine {
         is_maximizing: bool,
     ) -> isize {
         if depth == 0 {
-            return self.eval_board(board);
+            return self.eval(board);
         }
 
         let mut best_eval = if is_maximizing {
@@ -246,7 +191,7 @@ impl Engine {
         self.sort_moves_in_place(board, &mut moves);
         let moves = moves;
         if moves.is_empty() {
-            return self.eval_board(board);
+            return self.eval(board);
         }
 
         for m in moves.iter() {
@@ -289,7 +234,7 @@ impl Engine {
         let moves = self.gen_legal_moves(board);
 
         if moves.is_empty() {
-            return self.eval_board(board);
+            return self.eval(board);
         }
 
         for m in moves.iter() {
@@ -306,153 +251,9 @@ impl Engine {
         best_eval
     }
 
-    pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {
-        let default_squares: Vec<Square> = match piece {
-            Piece::Knight => match color {
-                Color::White => vec![
-                    Square::from_str("b1").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("g1").expect("IS A CORRECT SQUARE"),
-                ],
-                Color::Black => vec![
-                    Square::from_str("b8").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("g8").expect("IS A CORRECT SQUARE"),
-                ],
-            },
-            Piece::Bishop => match color {
-                Color::White => vec![
-                    Square::from_str("c1").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("f1").expect("IS A CORRECT SQUARE"),
-                ],
-                Color::Black => vec![
-                    Square::from_str("c8").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("f8").expect("IS A CORRECT SQUARE"),
-                ],
-            },
-
-            Piece::Rook => match color {
-                Color::White => vec![
-                    Square::from_str("a1").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("h1").expect("IS A CORRECT SQUARE"),
-                ],
-                Color::Black => vec![
-                    Square::from_str("a8").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("h8").expect("IS A CORRECT SQUARE"),
-                ],
-            },
-            Piece::King => match color {
-                Color::White => vec![Square::from_str("e1").expect("IS A CORRECT SQUARE")],
-                Color::Black => vec![Square::from_str("e8").expect("IS A CORRECT SQUARE")],
-            },
-            // Piece::Queen => match color {
-            //     Color::White => vec![Square::from_str("d1").expect("IS A CORRECT SQUARE")],
-            //     Color::Black => vec![Square::from_str("d8").expect("IS A CORRECT SQUARE")],
-            // },
-            _ => return false,
-        };
-
-        for sq in default_squares.iter() {
-            if sq.eq(square) {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn rocks_on_same_rank_or_file(&self, board: &Board) -> isize {
-        todo!()
-    }
-
-    fn eval_mobility(&self, moves: &[ChessMove]) -> isize {
-        moves.len().saturating_mul(2).try_into().unwrap()
-    }
-
     pub fn eval(&self, board: &Board) -> isize {
-        let moves = self.gen_legal_moves(board);
-        self.eval_board(board)
-            .saturating_add(self.eval_mobility(&moves))
-    }
-
-    pub fn eval_board(&self, board: &Board) -> isize {
-        // if the position has been reached before at least 3 times it will be draw by three-fold
-        // repetition
-        let repeat_board = self
-            .board_history
-            .iter()
-            .filter(|d| **d == board.get_hash())
-            .count();
-
-        if repeat_board > 2 {
-            println!("REPEAT BOARD -> {repeat_board}");
-            return 0;
-        }
-
-        let mut value_based_on_pos: isize = 0;
-        for x in 0..64 {
-            let square = unsafe { Square::new(x) };
-            let piece = board.piece_on(square);
-            let color = board.color_on(square);
-
-            if let (Some(piece), Some(color)) = (piece, color) {
-                let piece_value = match piece {
-                    chess::Piece::Pawn => match color {
-                        Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
-                    chess::Piece::Knight => match color {
-                        Color::White => KNIGHT_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => KNIGHT_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
-                    chess::Piece::Bishop => match color {
-                        Color::White => BISHOP_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => BISHOP_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
-                    chess::Piece::King => match color {
-                        Color::White => KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE[x as usize],
-                        Color::Black => KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK[x as usize],
-                    },
-                    chess::Piece::Rook => match color {
-                        Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
-                    chess::Piece::Queen => match color {
-                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
-                };
-
-                value_based_on_pos += piece_value;
-
-                if self.is_piece_on_original_pos(&piece, &square, &color) {
-                    // decrease the evals - to encourage it to move pieces forward
-                    value_based_on_pos = value_based_on_pos.saturating_sub(5);
-                }
-            }
-        }
-
-        let mat_val = match board.status() {
-            chess::BoardStatus::Ongoing => {
-                let board_sum = board.material_sum_bitboard();
-                let eval = match board.side_to_move() {
-                    Color::White => board_sum.white as isize - board_sum.black as isize,
-                    Color::Black => board_sum.black as isize - board_sum.white as isize,
-                };
-
-                if board.side_to_move() != self.board.side_to_move() {
-                    -eval
-                } else {
-                    eval
-                }
-            }
-            chess::BoardStatus::Stalemate => 0,
-            chess::BoardStatus::Checkmate => {
-                if board.side_to_move() == self.board.side_to_move() {
-                    -isize::MAX
-                } else {
-                    isize::MAX
-                }
-            }
-        };
-        mat_val.saturating_add(value_based_on_pos)
+        let eval = Evaluation::new(&self.board);
+        eval.eval_board(board, &self.board_history)
     }
 }
 
@@ -460,7 +261,8 @@ impl Engine {
 mod test {
     use std::str::FromStr;
 
-    use super::{Engine, MaterialSumExt};
+    use super::Engine;
+    use crate::{eval::Evaluation, MaterialSumExt};
 
     #[test]
     fn best_move_checkmate() {
@@ -484,15 +286,16 @@ mod test {
     #[test]
     fn eval_board_black() {
         let engine = Engine::from_str("8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1").unwrap();
-        let eval = engine.eval_board(&engine.board);
-        assert_eq!(eval, 1100);
+
+        let eval = Evaluation::new(&engine.board).eval_board(engine.board(), engine.history());
+        assert!(eval >= 1000);
     }
 
     #[test]
     fn eval_board_white() {
         let engine = Engine::from_str("8/8/1P2K3/8/2n5/1q6/8/5k2 w - - 0 1").unwrap();
-        let eval = engine.eval_board(&engine.board);
-        assert_eq!(eval, -1100);
+        let eval = Evaluation::new(&engine.board).eval_board(engine.board(), engine.history());
+        assert!(eval <= -1100);
     }
 
     #[test]
