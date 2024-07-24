@@ -1,6 +1,6 @@
 extern crate chess;
 
-use chess_engine::uci;
+use chess_engine::*;
 use std::panic;
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
         }
     }));
     {
-        let mut uci = uci::UCI::new();
+        let mut uci = UCI::new();
         uci.rx();
     }
 }

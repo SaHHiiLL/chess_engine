@@ -79,7 +79,7 @@ impl Engine {
     }
 
     /// Sorts moves based on if the move captures a piece or does a promotion
-    /// if a move is a capture or promotion it will be send higher in the list
+    /// if a move is a capture or promotion it will be sent higher in the list
     /// this will help the `alpha-beta` pruning
     fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove]) {
         moves.sort_by(|d: &ChessMove, other: &ChessMove| {
@@ -218,10 +218,10 @@ impl Engine {
 
     fn search_minimax(&mut self, depth: usize, board: &Board, is_maximizing: bool) -> isize {
         if depth == 0 {
-            if board.checkers().0 != 0 {
-                return self.search_minimax(depth + 1, board, !is_maximizing);
+            return if board.checkers().0 != 0 {
+                self.search_minimax(depth + 1, board, !is_maximizing)
             } else {
-                return self.eval(board);
+                self.eval(board)
             }
         }
 
@@ -253,7 +253,9 @@ impl Engine {
 
     pub fn eval(&self, board: &Board) -> isize {
         let eval = Evaluation::new(&self.board);
+        let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
+            .saturating_sub(eval.eval_mobility(&moves))
     }
 }
 

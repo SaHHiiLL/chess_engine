@@ -1,3 +1,4 @@
+#![feature(const_evaluatable_checked, const_for)]
 use std::collections::HashMap;
 
 lazy_static::lazy_static! {
@@ -67,6 +68,18 @@ lazy_static::lazy_static! {
     ];
     pub static ref ROOK_VALUE_PER_SQUARE_BLACK: Vec<isize> =
         ROOK_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
+
+    pub static ref KING_VALUE_PER_SQUARE_ENDGAME_WHITE: Vec<isize> = vec![
+        -50,-40,-30,-20,-20,-30,-40,-50,
+-30,-20,-10,  0,  0,-10,-20,-30,
+-30,-10, 20, 30, 30, 20,-10,-30,
+-30,-10, 30, 40, 40, 30,-10,-30,
+-30,-10, 30, 40, 40, 30,-10,-30,
+-30,-10, 20, 30, 30, 20,-10,-30,
+-30,-30,  0,  0,  0,  0,-30,-30,
+-50,-30,-30,-30,-30,-30,-30,-50
+];
+    pub static ref KING_VALUE_PER_SQUARE_ENDGAME_BLACK: Vec<isize> = KING_VALUE_PER_SQUARE_ENDGAME_WHITE.iter().copied().rev().collect();
     pub static ref FEN_STRING: Vec<String> = vec![
         String::from("r6r/1b2k1bq/8/8/7B/8/8/R3K2R b KQ - 3 2"),
         String::from("8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0 3"),
@@ -93,3 +106,36 @@ lazy_static::lazy_static! {
         String::from("8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1"),
     ];
 }
+const fn reverse<const N: usize>(arr: [isize; N]) -> [isize; N] {
+    let mut reversed = [0; N];
+    let mut i = 0;
+    while i < N {
+        reversed[i] = arr[N - 1 - i];
+        i += 1;
+    }
+    reversed
+}
+pub const KING_MIDDLE_WHITE: [isize; 64] = [
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+    20, 20,  0,  0,  0,  0, 20, 20,
+    20, 30, 10,  0,  0, 10, 30, 20
+];
+
+pub const KING_MIDDLE_BLACK: [isize; 64] = reverse(KING_MIDDLE_WHITE);
+
+pub const KING_ENDGAME_WHITE: [isize; 64] = [
+    -50,-40,-30,-20,-20,-30,-40,-50,
+    -30,-20,-10,  0,  0,-10,-20,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-30,  0,  0,  0,  0,-30,-30,
+    -50,-30,-30,-30,-30,-30,-30,-50
+];
+pub const KING_ENDGAME_BLACK: [isize; 64] = reverse(KING_ENDGAME_WHITE);

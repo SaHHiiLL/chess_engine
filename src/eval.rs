@@ -1,16 +1,22 @@
-use std::{cmp::Ordering, str::FromStr};
+use std::{cmp::Ordering, collections::HashSet, str::FromStr};
 
-use crate::MaterialSumExt;
+use crate::{consts, MaterialSumExt, KING_ENDGAME_WHITE, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::consts::{
-    BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE,
-    KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK, KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE,
-    KNIGHT_VALUE_PER_SQUARE_BLACK, KNIGHT_VALUE_PER_SQUARE_WHITE, PAWN_VALUE_PER_SQUARE_BLACK,
-    PAWN_VALUE_PER_SQUARE_WHITE, PIECE_VALUE_MAP, QUEEN_VALUE_PER_SQUARE_BLACK,
-    QUEEN_VALUE_PER_SQUARE_WHITE, ROOK_VALUE_PER_SQUARE_BLACK, ROOK_VALUE_PER_SQUARE_WHITE,
+use crate::{
+    BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE, KNIGHT_VALUE_PER_SQUARE_BLACK,
+    KNIGHT_VALUE_PER_SQUARE_WHITE, PAWN_VALUE_PER_SQUARE_BLACK, PAWN_VALUE_PER_SQUARE_WHITE,
+    QUEEN_VALUE_PER_SQUARE_BLACK, QUEEN_VALUE_PER_SQUARE_WHITE, ROOK_VALUE_PER_SQUARE_BLACK,
+    ROOK_VALUE_PER_SQUARE_WHITE,
 };
 
+pub enum GamePhases {
+    Opening,
+    MiddleGame,
+    EndGame,
+}
+
+#[derive(Hash, Eq, PartialEq, Debug)]
 pub enum EvalFlags {
     PieceCount,
     Mobility,
@@ -120,8 +126,8 @@ impl<'a> Evaluation<'a> {
                         Color::Black => BISHOP_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
                     chess::Piece::King => match color {
-                        Color::White => KING_VALUE_PER_SQUARE_MIDDLE_GAME_WHITE[x as usize],
-                        Color::Black => KING_VALUE_PER_SQUARE_MIDDLE_GAME_BLACK[x as usize],
+                        Color::White => KING_MIDDLE_WHITE[x as usize],
+                        Color::Black => KING_MIDDLE_BLACK[x as usize],
                     },
                     chess::Piece::Rook => match color {
                         Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
@@ -166,5 +172,9 @@ impl<'a> Evaluation<'a> {
             }
         };
         mat_val.saturating_add(value_based_on_pos)
+    }
+
+    pub fn eval_mobility(&self, moves: &[ChessMove]) -> isize {
+        moves.len().saturating_mul(2).try_into().unwrap()
     }
 }

@@ -8,6 +8,9 @@ pub(crate) mod eval;
 pub(crate) mod opening;
 pub mod uci;
 
+pub use consts::*;
+pub use uci::*;
+
 pub struct BoardMaterial {
     pub white: u32,
     pub black: u32,
