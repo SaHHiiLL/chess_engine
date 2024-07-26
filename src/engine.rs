@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, str::FromStr};
+use std::{cmp::Ordering, default, str::FromStr};
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
@@ -19,13 +19,35 @@ impl GamePhases {
     }
 }
 
-trait IsCaptureMoveExt {
-    fn is_capture_move(&self, chess_move: ChessMove) -> bool;
+enum MoveType {
+    Normal,
+    Castle,
+    Capture,
+    EnPassant,
+    Promotion,
+    Invalid,
 }
 
-impl IsCaptureMoveExt for chess::Board {
-    fn is_capture_move(&self, chess_move: ChessMove) -> bool {
-        self.piece_on(chess_move.get_dest()).is_some()
+trait PieceOnBoardExt {
+    fn get_piece(&self, sq: Square) -> Option<(chess::Piece, chess::Color)>;
+}
+
+impl PieceOnBoardExt for Board {
+    fn get_piece(&self, sq: Square) -> Option<(chess::Piece, chess::Color)> {
+        Some((self.piece_on(sq)?, self.color_on(sq)?))
+    }
+}
+
+/// Gets the piece the move
+trait MovePiecesExt {
+    fn move_type(&self, chess_move: &ChessMove);
+}
+
+impl MovePiecesExt for Board {
+    fn move_type(&self, chess_move: &ChessMove) {
+        let source = chess_move.get_source();
+        let dest = chess_move.get_dest();
+        todo!()
     }
 }
 
@@ -222,7 +244,7 @@ impl Engine {
                 self.search_minimax(depth + 1, board, !is_maximizing)
             } else {
                 self.eval(board)
-            }
+            };
         }
 
         let mut best_eval = if is_maximizing {
