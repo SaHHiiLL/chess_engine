@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::HashSet, str::FromStr};
+use std::str::FromStr;
 
-use crate::{consts, MaterialSumExt, KING_ENDGAME_WHITE, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
+use crate::{BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
@@ -16,27 +16,57 @@ pub enum GamePhases {
     EndGame,
 }
 
+impl Default for GamePhases {
+    fn default() -> Self {
+        Self::Opening
+    }
+}
+
+impl GamePhases {
+    fn update(&mut self, mat: BoardMaterial, board: &Board) {
+        if board.pieces(Piece::Queen).0 == 0 {
+            self.set_endgame();
+        } else {
+            self.set_middlegame();
+        }
+    }
+
+    fn set_endgame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+
+    fn set_middlegame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+}
+
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub enum EvalFlags {
     PieceCount,
     Mobility,
     KingSafety,
+    PieceSquare,
+    FavourBishopPairs,
 }
 
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
     flags: &'a [EvalFlags],
+    phases: GamePhases,
 }
 
 impl<'a> Evaluation<'a> {
-    pub fn new(board: &'a Board) -> Self {
+    pub fn new(engine_side: &'a Board) -> Self {
         Self {
-            engine_side: board,
+            engine_side,
             flags: &[
                 EvalFlags::KingSafety,
                 EvalFlags::Mobility,
                 EvalFlags::PieceCount,
+                EvalFlags::PieceSquare,
+                EvalFlags::FavourBishopPairs,
             ],
+            phases: Default::default(),
         }
     }
 
@@ -88,6 +118,26 @@ impl<'a> Evaluation<'a> {
         false
     }
 
+    /// adds a bonus for having a bishop pair of the engine side
+    fn favour_bishop_pair(&self, board: &Board) -> isize {
+        let b_p = board.pieces(Piece::Bishop);
+        if b_p.0 == 0 {
+            return 0;
+        }
+        let mut res = 0;
+        let color_bp = match board.side_to_move() {
+            Color::White => board.color_combined(Color::White) & b_p,
+            Color::Black => board.color_combined(Color::Black) & b_p,
+        };
+
+        if (board.side_to_move() == self.engine_side.side_to_move()) && color_bp.count() == 2 {
+            res += 10;
+        } else {
+            res -= 10;
+        }
+        res
+    }
+
     pub fn eval_board(&self, board: &Board, board_history: &[u64]) -> isize {
         // if the position has been reached before at least 3 times it will be draw by three-fold
         // repetition
@@ -125,24 +175,25 @@ impl<'a> Evaluation<'a> {
                         Color::White => BISHOP_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => BISHOP_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    chess::Piece::King => match color {
-                        Color::White => KING_MIDDLE_WHITE[x as usize],
-                        Color::Black => KING_MIDDLE_BLACK[x as usize],
-                    },
+                    // chess::Piece::King => match color {
+                    //     Color::White => KING_MIDDLE_WHITE[x as usize],
+                    //     Color::Black => KING_MIDDLE_BLACK[x as usize],
+                    // },
                     chess::Piece::Rook => match color {
                         Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    chess::Piece::Queen => match color {
-                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
+                    // chess::Piece::Queen => match color {
+                    //     Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
+                    //     Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
+                    // },
+                    _ => 0,
                 };
 
                 value_based_on_pos += piece_value;
 
                 if self.is_piece_on_original_pos(&piece, &square, &color) {
-                    // decrease the evals - to encourage it to move pieces forward
+                    // decrease the evals - to encourage to move pieces forward
                     value_based_on_pos = value_based_on_pos.saturating_sub(5);
                 }
             }
@@ -171,7 +222,9 @@ impl<'a> Evaluation<'a> {
                 }
             }
         };
-        mat_val.saturating_add(value_based_on_pos)
+        mat_val
+            .saturating_add(value_based_on_pos)
+            .saturating_add(self.favour_bishop_pair(board))
     }
 
     pub fn eval_mobility(&self, moves: &[ChessMove]) -> isize {

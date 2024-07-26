@@ -1,7 +1,6 @@
 #![feature(test)]
 
 use chess::{Board, Color, Square};
-use consts::PIECE_VALUE_MAP;
 pub(crate) mod consts;
 pub(crate) mod engine;
 pub(crate) mod eval;
