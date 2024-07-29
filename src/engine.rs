@@ -1,21 +1,55 @@
-use std::{cmp::Ordering, default, str::FromStr};
+use std::{
+    cmp::Ordering,
+    default,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::eval::Evaluation;
+use crate::{eval::Evaluation, BoardMaterial};
 
-enum GamePhases {
+#[derive(Clone)]
+pub enum GamePhases {
     Opening,
     MiddleGame,
     EndGame,
 }
 
+impl Default for GamePhases {
+    fn default() -> Self {
+        Self::Opening
+    }
+}
+
 impl GamePhases {
-    fn from_material_count(board: &Board) -> Self {
+    fn update(&mut self, mat: BoardMaterial, board: &Board) {
         if board.pieces(Piece::Queen).0 == 0 {
-            return GamePhases::EndGame;
+            self.set_endgame();
+        } else {
+            self.set_middlegame();
         }
-        todo!()
+    }
+
+    fn set_endgame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+
+    fn set_middlegame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+}
+
+#[derive(Clone)]
+struct GameState {
+    game_phases: GamePhases,
+}
+
+impl GameState {
+    fn new() -> Self {
+        Self {
+            game_phases: GamePhases::Opening,
+        }
     }
 }
 
@@ -56,6 +90,7 @@ pub struct Engine {
     best_move: Option<ChessMove>,
     side_playing: chess::Color,
     board_history: Vec<u64>,
+    game_state: GameState,
 }
 
 impl Default for Engine {
@@ -74,6 +109,7 @@ impl FromStr for Engine {
             best_move: None,
             side_playing: board.side_to_move(),
             board_history: vec![],
+            game_state: GameState::new(),
         })
     }
 }
@@ -93,6 +129,7 @@ impl Engine {
             best_move: None,
             side_playing: chess::Color::White,
             board_history: vec![],
+            game_state: GameState::new(),
         }
     }
 
@@ -185,6 +222,18 @@ impl Engine {
             if next_eval > best_eval || self.best_move.is_none() {
                 best_eval = next_eval;
                 let _ = self.best_move.insert(*m);
+            }
+        }
+        best_eval
+    }
+
+    fn search_iterative_deeping(&mut self, search_cancel: Arc<bool>) -> isize {
+        let mut best_eval = -isize::MAX;
+        for x in 1..usize::MAX {
+            let eval = self.search(x);
+            best_eval = best_eval.max(eval);
+            if search_cancel.clone() == true.into() {
+                break;
             }
         }
         best_eval

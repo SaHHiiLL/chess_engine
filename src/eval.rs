@@ -10,36 +10,6 @@ use crate::{
     ROOK_VALUE_PER_SQUARE_WHITE,
 };
 
-pub enum GamePhases {
-    Opening,
-    MiddleGame,
-    EndGame,
-}
-
-impl Default for GamePhases {
-    fn default() -> Self {
-        Self::Opening
-    }
-}
-
-impl GamePhases {
-    fn update(&mut self, mat: BoardMaterial, board: &Board) {
-        if board.pieces(Piece::Queen).0 == 0 {
-            self.set_endgame();
-        } else {
-            self.set_middlegame();
-        }
-    }
-
-    fn set_endgame(&mut self) {
-        *self = GamePhases::EndGame
-    }
-
-    fn set_middlegame(&mut self) {
-        *self = GamePhases::EndGame
-    }
-}
-
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub enum EvalFlags {
     PieceCount,
