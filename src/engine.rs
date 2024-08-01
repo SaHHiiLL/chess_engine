@@ -2,7 +2,8 @@ use std::{
     cmp::Ordering,
     default,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
+    time::Instant,
 };
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
@@ -227,14 +228,17 @@ impl Engine {
         best_eval
     }
 
-    fn search_iterative_deeping(&mut self, search_cancel: Arc<bool>) -> isize {
+    pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
+        println!("Iterative Deepinnn...");
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {
-            let eval = self.search(x);
-            best_eval = best_eval.max(eval);
-            if search_cancel.clone() == true.into() {
+            let now = Instant::now();
+            println!("info depth {}", x);
+            if now >= search_cancel_time {
                 break;
             }
+            let eval = self.search(x);
+            best_eval = best_eval.max(eval);
         }
         best_eval
     }

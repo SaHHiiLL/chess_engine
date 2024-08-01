@@ -1,9 +1,14 @@
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    time::Duration,
+    iter::once,
+    ops::Add,
+    sync::{Arc, RwLock},
+    time::{Duration, Instant},
 };
-
+// Scheduler, trait for .seconds(), .minutes(), etc., and trait with job scheduling methods
+use clokwerk::Interval::*;
+use clokwerk::{Job, Scheduler, TimeUnits};
 use std::str::FromStr;
 
 use chess::ChessMove;
@@ -89,7 +94,10 @@ impl UCI {
             }
             _ => {}
         };
-        self.engine.search(4);
+
+        let now = Instant::now().add(Duration::from_secs(2));
+        self.engine.search_iterative_deeping(now);
+
         if let Some(mov) = self.engine.get_best_mov() {
             let msg = format!("bestmove {mov}");
             self.tx(msg);

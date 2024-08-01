@@ -5,6 +5,7 @@ pub(crate) mod consts;
 pub(crate) mod engine;
 pub(crate) mod eval;
 pub(crate) mod opening;
+pub(crate) mod trie;
 pub mod uci;
 
 pub use consts::*;

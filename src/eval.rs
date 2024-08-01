@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
-use crate::{BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
+use crate::{
+    engine::GamePhases, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
+};
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
