@@ -1,14 +1,11 @@
+use std::time::Duration;
+use std::time::Instant;
 use std::{
     collections::VecDeque,
     io::{self, Write},
-    iter::once,
     ops::Add,
-    sync::{Arc, RwLock},
-    time::{Duration, Instant},
 };
-// Scheduler, trait for .seconds(), .minutes(), etc., and trait with job scheduling methods
-use clokwerk::Interval::*;
-use clokwerk::{Job, Scheduler, TimeUnits};
+
 use std::str::FromStr;
 
 use chess::ChessMove;
@@ -112,12 +109,12 @@ impl UCI {
             }
         };
 
-        fn parse_moves(mut str: VecDeque<&str>) -> VecDeque<ChessMove> {
-            let mut res = VecDeque::new();
+        fn parse_moves(mut str: VecDeque<&str>) -> Vec<ChessMove> {
+            let mut res = Vec::new();
             while let Some(mov) = str.pop_front() {
                 let _ = mov
                     .parse::<ChessMove>()
-                    .map(|chessmove| res.push_back(chessmove));
+                    .map(|chessmove| res.push(chessmove));
             }
             res
         }
@@ -136,16 +133,14 @@ impl UCI {
                 self.engine = Engine::from_str(&fen).unwrap();
 
                 let moves = parse_moves(cmd);
-                // self.engine = Engine::new();
-                self.engine.play_moves(moves.into());
+                self.engine.play_moves(moves);
             }
             "startpos" => {
                 let moves = parse_moves(cmd);
-                self.engine = Engine::new();
-                self.engine.play_moves(moves.into());
+                self.engine.update_board(*moves.iter().last().unwrap());
             }
             _ => {
-                let msg = "invalid args";
+                println!("info invalid cmd: {position_type}");
             }
         };
     }

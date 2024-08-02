@@ -20,13 +20,24 @@ impl<T: Copy + Clone + Hash + Eq + Display> Node<T> {
     fn print(&self, prefix: &str) {
         for (ch, node) in &self.children {
             let new_prefix = format!("{}{}", prefix, ch);
-            println!("{}", new_prefix);
+            println!("a{}", new_prefix);
+        }
+    }
+
+    fn pprint(&self, prefix: &str, level: usize) {
+        let indent = "  ".repeat(level);
+        println!("{}{}", indent, prefix);
+        if self.is_end {
+            println!("{}[END]", indent);
+        }
+        for (ch, node) in &self.children {
+            node.pprint(&ch.to_string(), level + 1);
         }
     }
 }
 
 #[derive(Debug, Clone)]
-struct Trie<T: Copy + Eq + Clone + Hash> {
+pub struct Trie<T: Copy + Eq + Clone + Hash> {
     root: Node<T>,
 }
 
@@ -73,8 +84,8 @@ impl<T: Copy + Clone + Eq + Hash> Trie<T> {
 }
 
 impl<T: Copy + Clone + Hash + Eq + Display> Trie<T> {
-    fn print(&self) {
-        self.root.print("");
+    pub fn print(&self) {
+        self.root.pprint("", 0);
     }
 }
 

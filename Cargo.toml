@@ -5,10 +5,5 @@ edition = "2021"
 
 [dependencies]
 chess = "3.2.0"
-clokwerk = "0.4.0"
 lazy_static = "1.5.0"
 rand = "0.8.5"
-rayon = "1.10.0"
-serde = "*"
-serde_json = "*"
-w-pgn = "0.1.2"

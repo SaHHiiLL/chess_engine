@@ -183,6 +183,13 @@ impl Engine {
         };
     }
 
+    pub fn update_board(&mut self, mov: ChessMove) {
+        let board = self.board.make_move_new(mov);
+        self.board = board;
+        self.board_history.push(board.get_hash());
+    }
+
+    // TODO: depericate 02/08/2024
     pub fn play_moves(&mut self, moves: Vec<ChessMove>) {
         self.board_history.clear();
         for m in moves.iter() {
@@ -229,7 +236,7 @@ impl Engine {
     }
 
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
-        println!("Iterative Deepinnn...");
+        println!("info starting Iterative Deepinnn");
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {
             let now = Instant::now();
