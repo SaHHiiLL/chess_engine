@@ -3,7 +3,7 @@ use std::str::FromStr;
 use crate::{
     engine::GamePhases, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
 };
-use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
+use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
     BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE, KNIGHT_VALUE_PER_SQUARE_BLACK,
@@ -90,6 +90,50 @@ impl<'a> Evaluation<'a> {
         false
     }
 
+    fn rook_control_file(&self, board: &Board, sqaure: Square) -> isize {
+        todo!()
+    }
+
+    fn pass_pawn(&self, board: &Board, square: Square, color: Color) -> isize {
+        let pawn_mask = match color {
+            Color::White => self.pass_pawn_bitmask_white(square),
+            Color::Black => self.pass_pawn_bitmask_black(square),
+        };
+
+        if (pawn_mask & board.combined()) == chess::BitBoard(0) {
+            15
+        } else {
+            0
+        }
+    }
+
+    /// creates a bitmask to check if a pawn can be considered as passed pawned or not
+    fn pass_pawn_bitmask_black(&self, square: Square) -> BitBoard {
+        let a_file: u64 = 72340172838076673;
+        let file_idx = square.get_file().to_index() as u64;
+
+        let pawn_file = a_file << file_idx;
+        let left_file_idx: u64 = a_file << (file_idx.saturating_sub(1)).max(0);
+        let right_file_idx: u64 = a_file << (file_idx + 1).min(7);
+        let pawn_file = pawn_file | left_file_idx | right_file_idx;
+
+        let shift_rank = pawn_file << 8 * (square.get_rank().to_index() as u64 + 1);
+        BitBoard(shift_rank)
+    }
+
+    fn pass_pawn_bitmask_white(&self, square: Square) -> BitBoard {
+        let a_file: u64 = 72340172838076673;
+        let file_idx = square.get_file().to_index() as u64;
+
+        let pawn_file = a_file << file_idx;
+        let left_file_idx: u64 = a_file << (file_idx.saturating_sub(1)).max(0);
+        let right_file_idx: u64 = a_file << (file_idx + 1).min(7);
+        let pawn_file = pawn_file | left_file_idx | right_file_idx;
+
+        let shift_rank = pawn_file >> 8 * (square.get_rank().to_index() as u64 + 1);
+        BitBoard(shift_rank)
+    }
+
     /// adds a bonus for having a bishop pair of the engine side
     fn favour_bishop_pair(&self, board: &Board) -> isize {
         let b_p = board.pieces(Piece::Bishop);
@@ -151,11 +195,11 @@ impl<'a> Evaluation<'a> {
                         Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    // chess::Piece::Queen => match color {
-                    //     Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
-                    //     Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    // },
-                    _ => 0,
+                    chess::Piece::Queen => match color {
+                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
+                    },
+                    _ => {continue}
                 };
 
                 value_based_on_pos += piece_value;
