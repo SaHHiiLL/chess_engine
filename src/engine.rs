@@ -1,6 +1,5 @@
 use std::{
     cmp::Ordering,
-    default,
     str::FromStr,
     sync::{Arc, Mutex, RwLock},
     time::Instant,
@@ -8,9 +7,9 @@ use std::{
 
 use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::{eval::Evaluation, BoardMaterial};
+use crate::{eval::Evaluation, BoardMaterial, OpeningDatabase};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum GamePhases {
     Opening,
     MiddleGame,
@@ -41,15 +40,22 @@ impl GamePhases {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct GameState {
     game_phases: GamePhases,
+    last_move: Option<ChessMove>,
+    has_black_castel: bool,
+    has_white_castel: bool,
+    black_castel_right: bool,
+    white_castel_right: bool,
 }
 
 impl GameState {
     fn new() -> Self {
         Self {
             game_phases: GamePhases::Opening,
+            last_move: None,
+            ..Default::default()
         }
     }
 }
@@ -92,12 +98,7 @@ pub struct Engine {
     side_playing: chess::Color,
     board_history: Vec<u64>,
     game_state: GameState,
-}
-
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
-    }
+    opening_database: OpeningDatabase,
 }
 
 impl FromStr for Engine {
@@ -111,6 +112,7 @@ impl FromStr for Engine {
             side_playing: board.side_to_move(),
             board_history: vec![],
             game_state: GameState::new(),
+            opening_database: OpeningDatabase::new(),
         })
     }
 }
@@ -124,8 +126,13 @@ impl Engine {
         &self.board_history
     }
 
+    pub fn add_opening_db(&mut self, op_db: OpeningDatabase) {
+        self.opening_database = op_db;
+    }
+
     pub fn new() -> Self {
         Self {
+            opening_database: OpeningDatabase::new(),
             board: Board::default(),
             best_move: None,
             side_playing: chess::Color::White,
@@ -176,45 +183,17 @@ impl Engine {
         self.best_move
     }
 
+    /// the engine will play the best move on to it's inner `Board`
     pub fn play_best_move(&mut self) {
-        if let Some(mov) = self.best_move {
-            self.board = self.board.make_move_new(mov);
-            self.board_history.clear();
-        };
+        self.play_move(self.best_move.unwrap());
     }
 
-    pub fn update_board(&mut self, mov: ChessMove) {
+    pub fn play_move(&mut self, mov: ChessMove) {
         let board = self.board.make_move_new(mov);
         self.board = board;
         self.board_history.push(board.get_hash());
-    }
-
-    // TODO: depericate 02/08/2024
-    pub fn play_moves(&mut self, moves: Vec<ChessMove>) {
-        self.board_history.clear();
-        for m in moves.iter() {
-            let board = self.board.make_move_new(*m);
-            self.board = board;
-            self.board_history.push(board.get_hash());
-        }
+        self.game_state.last_move = Some(mov);
         self.side_playing = self.board.side_to_move();
-    }
-
-    pub fn search_slow(&mut self, depth: usize) -> isize {
-        let legal_moves = self.gen_legal_moves(&self.board);
-        let mut best_eval = -isize::MAX;
-
-        for m in legal_moves.iter() {
-            // make the move
-            let next_board = self.board.make_move_new(*m);
-            let next_eval = self.search_minimax(depth, &next_board, false);
-
-            if next_eval > best_eval || self.best_move.is_none() {
-                best_eval = next_eval;
-                let _ = self.best_move.insert(*m);
-            }
-        }
-        best_eval
     }
 
     pub fn search(&mut self, depth: usize) -> isize {
@@ -235,7 +214,42 @@ impl Engine {
         best_eval
     }
 
+    /// TODO: make this better,
+    /// BUG: the bot only plays the lines it can find, even if the other player has gone out of the line
+    fn get_best_move_from_opening_database(&mut self) -> bool {
+        if self.game_state.last_move.is_some() {
+            match !self
+                .opening_database
+                .choose_opening_move(self.game_state.last_move.unwrap())
+            {
+                true => {
+                    self.game_state.game_phases.set_middlegame();
+                    return false;
+                }
+                false => (),
+            }
+        }
+
+        let x = self
+            .opening_database
+            .root()
+            .childern()
+            .keys()
+            .next()
+            .unwrap();
+        let _ = self.best_move.insert(*x);
+        self.opening_database
+            .choose_opening_move(self.best_move.expect("SETTING IT RIGHT BEFORE THIS"));
+        true
+    }
+
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
+        if !self.opening_database.is_end()
+            && self.game_state.game_phases == GamePhases::Opening
+            && self.get_best_move_from_opening_database()
+        {
+            return 0;
+        }
         println!("info starting Iterative Deepinnn");
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {
@@ -298,41 +312,6 @@ impl Engine {
         best_eval
     }
 
-    fn search_minimax(&mut self, depth: usize, board: &Board, is_maximizing: bool) -> isize {
-        if depth == 0 {
-            return if board.checkers().0 != 0 {
-                self.search_minimax(depth + 1, board, !is_maximizing)
-            } else {
-                self.eval(board)
-            };
-        }
-
-        let mut best_eval = if is_maximizing {
-            -isize::MAX
-        } else {
-            isize::MAX
-        };
-
-        let moves = self.gen_legal_moves(board);
-
-        if moves.is_empty() {
-            return self.eval(board);
-        }
-
-        for m in moves.iter() {
-            // make the move
-            let next_board = board.make_move_new(*m);
-            let next_eval = self.search_minimax(depth - 1, &next_board, !is_maximizing);
-
-            if is_maximizing {
-                best_eval = best_eval.max(next_eval);
-            } else {
-                best_eval = best_eval.min(next_eval);
-            }
-        }
-        best_eval
-    }
-
     pub fn eval(&self, board: &Board) -> isize {
         let eval = Evaluation::new(&self.board);
         let moves = self.gen_legal_moves(board);
@@ -346,7 +325,7 @@ mod test {
     use std::str::FromStr;
 
     use super::Engine;
-    use crate::{eval::Evaluation, MaterialSumExt};
+    use crate::{eval::Evaluation, MaterialSumExt, OpeningDatabase};
 
     #[test]
     fn best_move_checkmate() {

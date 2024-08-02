@@ -123,10 +123,6 @@ impl<'a> Evaluation<'a> {
             return 0;
         }
 
-        if repeat_board != 0 {
-            println!("REPEAT BOARD -> {repeat_board}");
-        }
-
         let mut value_based_on_pos: isize = 0;
         for x in 0..64 {
             let square = unsafe { Square::new(x) };

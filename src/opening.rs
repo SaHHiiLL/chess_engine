@@ -4,41 +4,46 @@ use chess::{Board, ChessMove};
 
 use crate::trie::*;
 
-struct OpeningDatabase {
+#[derive(Clone)]
+pub struct OpeningDatabase {
     opening_lines: Trie<ChessMove>,
 }
 
 impl OpeningDatabase {
-    fn new() -> Self {
+    pub fn is_end(&self) -> bool {
+        self.opening_lines.is_end()
+    }
+    pub fn new() -> Self {
         Self {
             opening_lines: Trie::default(),
         }
     }
 
-    fn add_png(&mut self, pgn: String) {
+    pub fn choose_opening_move(&mut self, chess_move: ChessMove) -> bool {
+        self.opening_lines.change_root(chess_move)
+    }
+
+    pub fn add_png(&mut self, pgn: String) {
         let mut moves = vec![];
         let mut parser = PgnParser::new(pgn);
         let mut board = Board::default();
-        let mut idx = 1;
         while let Ok((white, black)) = parser.next_token() {
-            println!("idx: {idx}");
-            idx += 1;
-            let white_move = ChessMove::from_san(&board, &white)
-                .map_err(|_| println!("white {white}"))
-                .unwrap();
+            let white_move = ChessMove::from_san(&board, &white).unwrap();
             board = board.make_move_new(white_move);
             moves.push(white_move);
 
-            let black_move = ChessMove::from_san(&board, &black)
-                .map_err(|_| println!("black: {black}"))
-                .unwrap();
+            let black_move = ChessMove::from_san(&board, &black).unwrap();
             board = board.make_move_new(black_move);
             moves.push(black_move);
         }
         self.opening_lines.insert(&moves);
     }
 
-    fn print(&self) {
+    pub fn root(&self) -> &Node<ChessMove> {
+        self.opening_lines.root()
+    }
+
+    pub fn print(&self) {
         self.opening_lines.print()
     }
 }
@@ -100,7 +105,7 @@ impl PgnParser {
         }
     }
     fn is_letter(&self) -> bool {
-        return self.char.to_char().is_alphabetic();
+        self.char.to_char().is_alphabetic()
     }
 
     fn read_move(&mut self) -> String {
@@ -119,7 +124,6 @@ impl PgnParser {
     // (e4, e5)
     pub(crate) fn next_token(&mut self) -> Result<(String, String), ParseError> {
         self.skip_whitespace();
-        // let curr = self.char.to_char();
         let mut res = Err(ParseError::NoValidChar);
 
         loop {

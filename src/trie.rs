@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 #[derive(Debug, Clone)]
-struct Node<T: Copy + Clone + Eq + Hash> {
+pub struct Node<T: Copy + Clone + Eq + Hash> {
     children: HashMap<T, Node<T>>,
     // refers to end of opening
     is_end: bool,
@@ -34,6 +34,10 @@ impl<T: Copy + Clone + Hash + Eq + Display> Node<T> {
             node.pprint(&ch.to_string(), level + 1);
         }
     }
+
+    pub fn childern(&self) -> &HashMap<T, Node<T>> {
+        &self.children
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +54,9 @@ impl<T: Clone + Copy + Eq + Hash> Default for Trie<T> {
 }
 
 impl<T: Copy + Clone + Eq + Hash> Trie<T> {
+    pub fn is_end(&self) -> bool {
+        self.root.is_end
+    }
     pub fn insert(&mut self, items: &[T]) {
         let mut curr = &mut self.root;
         for i in items.iter() {
@@ -80,6 +87,10 @@ impl<T: Copy + Clone + Eq + Hash> Trie<T> {
             }
         }
         current.is_end
+    }
+
+    pub fn root(&self) -> &Node<T> {
+        &self.root
     }
 }
 

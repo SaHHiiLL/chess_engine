@@ -9,6 +9,7 @@ pub(crate) mod trie;
 pub mod uci;
 
 pub use consts::*;
+pub use opening::OpeningDatabase;
 pub use uci::*;
 
 pub struct BoardMaterial {
@@ -77,15 +78,6 @@ mod tests {
     use super::*;
     use crate::MaterialSumExt;
     use test::Bencher;
-
-    #[bench]
-    fn bench_search_minimax(b: &mut Bencher) {
-        b.iter(|| {
-            FEN_STRING.iter().take(3).for_each(|fen| {
-                Engine::from_str(fen).unwrap().search_slow(3);
-            })
-        });
-    }
 
     #[bench]
     fn bench_eval_board(b: &mut Bencher) {

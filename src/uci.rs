@@ -11,10 +11,12 @@ use std::str::FromStr;
 use chess::ChessMove;
 
 use crate::engine::Engine;
+use crate::OpeningDatabase;
 
 pub struct UCI {
     engine: Engine,
     curr_think_time: u64,
+    opening_db: OpeningDatabase,
 }
 
 impl UCI {
@@ -22,7 +24,13 @@ impl UCI {
         Self {
             engine: Engine::new(),
             curr_think_time: 0,
+            opening_db: OpeningDatabase::new(),
         }
+    }
+
+    pub fn add_db(&mut self, opening_database: OpeningDatabase) {
+        self.opening_db = opening_database.clone();
+        self.engine.add_opening_db(opening_database);
     }
 
     pub fn rx(&mut self) {
@@ -80,6 +88,7 @@ impl UCI {
 
     fn handle_ucinewgame_command(&mut self) {
         self.engine = Engine::new();
+        self.engine.add_opening_db(self.opening_db.clone());
     }
 
     fn handle_go_command(&mut self, mut args: VecDeque<&str>) {
@@ -97,6 +106,7 @@ impl UCI {
 
         if let Some(mov) = self.engine.get_best_mov() {
             let msg = format!("bestmove {mov}");
+            self.engine.play_best_move();
             self.tx(msg);
         }
     }
@@ -133,11 +143,17 @@ impl UCI {
                 self.engine = Engine::from_str(&fen).unwrap();
 
                 let moves = parse_moves(cmd);
-                self.engine.play_moves(moves);
+                if let Some(mov) = moves.iter().last() {
+                    println!("info playing last move {mov}");
+                    self.engine.play_move(*mov);
+                }
             }
             "startpos" => {
                 let moves = parse_moves(cmd);
-                self.engine.update_board(*moves.iter().last().unwrap());
+                if let Some(mov) = moves.iter().last() {
+                    println!("info playing last move {mov}");
+                    self.engine.play_move(*mov);
+                }
             }
             _ => {
                 println!("info invalid cmd: {position_type}");
@@ -148,5 +164,11 @@ impl UCI {
     fn tx<S: ToString>(&self, msg: S) {
         let msg = msg.to_string();
         println!("{msg}");
+    }
+}
+
+impl Default for UCI {
+    fn default() -> Self {
+        Self::new()
     }
 }
