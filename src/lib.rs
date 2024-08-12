@@ -4,6 +4,7 @@ use chess::{Board, Color, Square};
 pub(crate) mod consts;
 pub(crate) mod engine;
 pub(crate) mod eval;
+pub(crate) mod game_phase;
 pub(crate) mod opening;
 pub(crate) mod trie;
 pub mod uci;
@@ -83,7 +84,9 @@ mod tests {
     fn bench_eval_board(b: &mut Bencher) {
         b.iter(|| {
             let engine = Engine::from_str(&FEN_STRING[0]).unwrap();
-            Evaluation::new(engine.board()).eval_board(engine.board(), engine.history());
+            engine
+                .evaluation()
+                .eval_board(engine.board(), engine.history());
         })
     }
 

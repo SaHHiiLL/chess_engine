@@ -80,9 +80,14 @@ lazy_static::lazy_static! {
     pub static ref QUEEN_VALUE_PER_SQUARE_BLACK: Vec<isize> =
         QUEEN_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
     pub static ref ROOK_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0,
-        0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0,
-        -5, 0, 0, 0, 5, 5, 0, 0, 0
+  0,  0,  0,  0,  0,  0,  0,  0,
+  5, 10, 10, 10, 10, 10, 10,  5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+  0,  0,  0,  5,  5,  0,  0,  0
     ];
     pub static ref ROOK_VALUE_PER_SQUARE_BLACK: Vec<isize> =
         ROOK_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
