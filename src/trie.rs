@@ -61,6 +61,7 @@ impl<T: Copy + Clone + Eq + Hash> Trie<T> {
         let mut curr = &mut self.root;
         for i in items.iter() {
             curr = curr.children.entry(*i).or_default();
+            curr.is_end = false;
         }
         curr.is_end = true;
     }

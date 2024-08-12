@@ -2,8 +2,9 @@ use std::str::FromStr;
 
 use crate::{
     engine::GamePhases, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
+    PIECE_VALUE_MAP,
 };
-use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
+use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
     BISHOP_VALUE_PER_SQUARE_BLACK, BISHOP_VALUE_PER_SQUARE_WHITE, KNIGHT_VALUE_PER_SQUARE_BLACK,
@@ -42,7 +43,13 @@ impl<'a> Evaluation<'a> {
         }
     }
 
-    pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {
+    pub fn is_minor_piece_on_original_pos(
+        &self,
+        piece: &Piece,
+        square: &Square,
+        color: &Color,
+    ) -> isize {
+        let mut res = 0;
         let default_squares: Vec<Square> = match piece {
             Piece::Knight => match color {
                 Color::White => vec![
@@ -64,30 +71,59 @@ impl<'a> Evaluation<'a> {
                     Square::from_str("f8").expect("IS A CORRECT SQUARE"),
                 ],
             },
-
-            Piece::Rook => match color {
-                Color::White => vec![
-                    Square::from_str("a1").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("h1").expect("IS A CORRECT SQUARE"),
-                ],
-                Color::Black => vec![
-                    Square::from_str("a8").expect("IS A CORRECT SQUARE"),
-                    Square::from_str("h8").expect("IS A CORRECT SQUARE"),
-                ],
-            },
-            Piece::King => match color {
-                Color::White => vec![Square::from_str("e1").expect("IS A CORRECT SQUARE")],
-                Color::Black => vec![Square::from_str("e8").expect("IS A CORRECT SQUARE")],
-            },
-            _ => return false,
+            _ => return 0,
         };
 
         for sq in default_squares.iter() {
             if sq.eq(square) {
-                return true;
+                res += 10;
             }
         }
-        false
+        res
+    }
+
+    fn rook_control_file(&self, board: &Board, sqaure: Square) -> isize {
+        todo!()
+    }
+
+    fn pass_pawn(&self, board: &Board, square: Square, color: Color) -> isize {
+        let pawn_mask = match color {
+            Color::White => self.pass_pawn_bitmask_white(square),
+            Color::Black => self.pass_pawn_bitmask_black(square),
+        };
+
+        if (pawn_mask & board.combined()) == chess::BitBoard(0) {
+            90
+        } else {
+            0
+        }
+    }
+
+    /// creates a bitmask to check if a pawn can be considered as passed pawned or not
+    fn pass_pawn_bitmask_black(&self, square: Square) -> BitBoard {
+        let a_file: u64 = 72340172838076673;
+        let file_idx = square.get_file().to_index() as u64;
+
+        let pawn_file = a_file << file_idx;
+        let left_file_idx: u64 = a_file << (file_idx.saturating_sub(1)).max(0);
+        let right_file_idx: u64 = a_file << (file_idx + 1).min(7);
+        let pawn_file = pawn_file | left_file_idx | right_file_idx;
+
+        let shift_rank = pawn_file << 8 * (square.get_rank().to_index() as u64 + 2);
+        BitBoard(shift_rank)
+    }
+
+    fn pass_pawn_bitmask_white(&self, square: Square) -> BitBoard {
+        let a_file: u64 = 72340172838076673;
+        let file_idx = square.get_file().to_index() as u64;
+
+        let pawn_file = a_file << file_idx;
+        let left_file_idx: u64 = a_file << (file_idx.saturating_sub(1)).max(0);
+        let right_file_idx: u64 = a_file << (file_idx + 1).min(7);
+        let pawn_file = pawn_file | left_file_idx | right_file_idx;
+
+        let shift_rank = pawn_file >> 8 * (square.get_rank().to_index() as u64 + 1);
+        BitBoard(shift_rank)
     }
 
     /// adds a bonus for having a bishop pair of the engine side
@@ -103,11 +139,23 @@ impl<'a> Evaluation<'a> {
         };
 
         if (board.side_to_move() == self.engine_side.side_to_move()) && color_bp.count() == 2 {
-            res += 10;
+            res += 3;
         } else {
-            res -= 10;
+            res -= 3;
         }
         res
+    }
+
+    // fn king_value_pos(&self, board: &Board, color: Color) -> isize {
+    //     // first we need to get normalize the material count
+    //     // from 0 to 1
+    //     // then gradient it to max to min based on
+    // }
+    fn norm(&self, value: usize) -> f64 {
+        let max = crate::INITIAL_BOARD_VALUE as usize;
+        let min = crate::INITIAL_BOARD_VALUE as usize
+            - *PIECE_VALUE_MAP.get(&Piece::King).unwrap() as usize;
+        (value - min) as f64 / (max - min) as f64
     }
 
     pub fn eval_board(&self, board: &Board, board_history: &[u64]) -> isize {
@@ -119,7 +167,7 @@ impl<'a> Evaluation<'a> {
             .count();
 
         if repeat_board > 2 {
-            println!("REPEAT BOARD -> {repeat_board}");
+            println!("info REPEAT BOARD -> {repeat_board}");
             return 0;
         }
 
@@ -131,10 +179,14 @@ impl<'a> Evaluation<'a> {
 
             if let (Some(piece), Some(color)) = (piece, color) {
                 let piece_value = match piece {
-                    chess::Piece::Pawn => match color {
-                        Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
+                    chess::Piece::Pawn => {
+                        // gives a bonus for having passedpawn
+                        value_based_on_pos.saturating_add(self.pass_pawn(board, square, color));
+                        match color {
+                            Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
+                            Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
+                        }
+                    }
                     chess::Piece::Knight => match color {
                         Color::White => KNIGHT_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => KNIGHT_VALUE_PER_SQUARE_BLACK[x as usize],
@@ -143,27 +195,23 @@ impl<'a> Evaluation<'a> {
                         Color::White => BISHOP_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => BISHOP_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    // chess::Piece::King => match color {
-                    //     Color::White => KING_MIDDLE_WHITE[x as usize],
-                    //     Color::Black => KING_MIDDLE_BLACK[x as usize],
-                    // },
+                    chess::Piece::King => match color {
+                        Color::White => KING_MIDDLE_WHITE[x as usize],
+                        Color::Black => KING_MIDDLE_BLACK[x as usize],
+                    },
                     chess::Piece::Rook => match color {
                         Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    // chess::Piece::Queen => match color {
-                    //     Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
-                    //     Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    // },
-                    _ => 0,
+                    chess::Piece::Queen => match color {
+                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
+                    },
                 };
 
-                value_based_on_pos += piece_value;
-
-                if self.is_piece_on_original_pos(&piece, &square, &color) {
-                    // decrease the evals - to encourage to move pieces forward
-                    value_based_on_pos = value_based_on_pos.saturating_sub(5);
-                }
+                value_based_on_pos
+                    .saturating_add(piece_value)
+                    .saturating_add(self.is_minor_piece_on_original_pos(&piece, &square, &color));
             }
         }
 
@@ -197,5 +245,33 @@ impl<'a> Evaluation<'a> {
 
     pub fn eval_mobility(&self, moves: &[ChessMove]) -> isize {
         moves.len().saturating_mul(2).try_into().unwrap()
+    }
+}
+#[cfg(test)]
+
+mod test {
+    use std::str::FromStr;
+
+    use chess::{BitBoard, Board, Square};
+
+    use crate::MaterialSumExt;
+
+    use super::Evaluation;
+
+    #[test]
+    fn test_norm() {
+        let board = Board::from_str("8/8/8/2k5/2pP4/8/B7/4K3 b - d3 0 3").unwrap();
+        let eval = Evaluation::new(&board);
+        let norm = eval.norm(board.material_sum().white as usize);
+        println!("{}", norm);
+    }
+
+    #[test]
+    fn test_pass_pawn_mask() {
+        let square = Square::from_str("a4").unwrap();
+        let board = Board::default();
+        let eval = Evaluation::new(&board);
+        println!("{}", eval.pass_pawn_bitmask_white(square));
+        println!("{}", eval.pass_pawn_bitmask_black(square));
     }
 }

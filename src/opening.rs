@@ -131,7 +131,7 @@ impl PgnParser {
                 return Err(ParseError::NoValidChar);
             }
             let curr = self.char.to_char();
-            if self.is_letter() || curr == '0' {
+            if self.is_letter() {
                 let left_move = self.read_move();
                 let right_move = self.read_move();
                 res = Ok((left_move, right_move));

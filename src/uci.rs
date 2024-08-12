@@ -101,7 +101,7 @@ impl UCI {
             _ => {}
         };
 
-        let now = Instant::now().add(Duration::from_secs(2));
+        let now = Instant::now().add(Duration::from_secs(1));
         self.engine.search_iterative_deeping(now);
 
         if let Some(mov) = self.engine.get_best_mov() {

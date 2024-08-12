@@ -1,5 +1,5 @@
 #![feature(test)]
-
+#![allow(warnings)]
 use chess::{Board, Color, Square};
 pub(crate) mod consts;
 pub(crate) mod engine;
@@ -33,8 +33,8 @@ impl MaterialSumExt for chess::Board {
             if let (Some(piece_type), Some(color)) = (piece_type, color) {
                 let p = PIECE_VALUE_MAP.get(&piece_type).expect("You idiot");
                 match color {
-                    chess::Color::White => mat.white += *p,
-                    chess::Color::Black => mat.black += *p,
+                    chess::Color::White => mat.white += *p as u32,
+                    chess::Color::Black => mat.black += *p as u32,
                 };
             }
         }
@@ -61,8 +61,8 @@ impl MaterialSumExt for chess::Board {
             let white_piece = piece_bitboard & white_bitboard;
             let black_piece = piece_bitboard & black_bitboard;
             let piece_value = PIECE_VALUE_MAP.get(p).expect("YOU IDIOT");
-            mat.white += white_piece.0.count_ones() * piece_value;
-            mat.black += black_piece.0.count_ones() * piece_value;
+            mat.white += white_piece.0.count_ones() * *piece_value as u32;
+            mat.black += black_piece.0.count_ones() * *piece_value as u32;
         }
         mat
     }

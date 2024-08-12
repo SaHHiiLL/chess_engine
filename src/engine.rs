@@ -1,11 +1,6 @@
-use std::{
-    cmp::Ordering,
-    str::FromStr,
-    sync::{Arc, Mutex, RwLock},
-    time::Instant,
-};
+use std::{cmp::Ordering, str::FromStr, time::Instant};
 
-use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
+use chess::{Board, ChessMove, MoveGen, Piece, Square};
 
 use crate::{eval::Evaluation, BoardMaterial, OpeningDatabase};
 
@@ -214,8 +209,6 @@ impl Engine {
         best_eval
     }
 
-    /// TODO: make this better,
-    /// BUG: the bot only plays the lines it can find, even if the other player has gone out of the line
     fn get_best_move_from_opening_database(&mut self) -> bool {
         if self.game_state.last_move.is_some() {
             match !self
@@ -250,6 +243,7 @@ impl Engine {
         {
             return 0;
         }
+
         println!("info starting Iterative Deepinnn");
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {

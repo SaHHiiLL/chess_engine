@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 lazy_static::lazy_static! {
-    pub static ref PIECE_VALUE_MAP: HashMap<chess::Piece, u32> = {
+    pub static ref PIECE_VALUE_MAP: HashMap<chess::Piece, u16> = {
         let mut map = HashMap::new();
         map.insert(chess::Piece::King, 20_000);
         map.insert(chess::Piece::Queen, 900);
@@ -12,13 +12,16 @@ lazy_static::lazy_static! {
         map.insert(chess::Piece::Pawn, 100);
         map
     };
-    pub static ref INITIAL_VALUE: u16 = 23_900;
-    pub static ref CHECKMATE_VALUE: isize = 23_900 * 2;
+
     pub static ref KNIGHT_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40,
-        -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -20, -30, -30, -40,
-        -40, -30, -30, -20, -10, -20, -20, -20, -20, -20, -20, -10, 20, 20, 0, 0, 0, 0, 20, 20, 20,
-        30, 10, 0, 0, 10, 30, 20
+        -50,-40,-30,-30,-30,-30,-40,-50,
+        -40,-20,  0,  0,  0,  0,-20,-40,
+        -30,  0, 10, 15, 15, 10,  0,-30,
+        -30,  5, 15, 20, 20, 15,  5,-30,
+        -30,  0, 15, 20, 20, 15,  0,-30,
+        -30,  5, 10, 15, 15, 10,  5,-30,
+        -40,-20,  0,  5,  5,  0,-20,-40,
+        -50,-40,-30,-30,-30,-30,-40,-50,
     ];
     pub static ref KNIGHT_VALUE_PER_SQUARE_BLACK: Vec<isize> = KNIGHT_VALUE_PER_SQUARE_WHITE
         .iter()
@@ -26,16 +29,26 @@ lazy_static::lazy_static! {
         .rev()
         .collect();
     pub static ref PAWN_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30, 20, 10, 10, 5,
-        5, 10, 25, 25, 10, 5, 5, 0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5, 5, 10, 10,
-        -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0
+         0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         5, -5,-10,  0,  0,-10, -5,  5,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
     ];
     pub static ref PAWN_VALUE_PER_SQUARE_BLACK: Vec<isize> =
         PAWN_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
     pub static ref BISHOP_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 10, 10, 5,
-        0, -10, -10, 5, 5, 10, 10, 5, 5, -10, -10, 0, 10, 10, 10, 10, 0, -10, -10, 10, 10, 10, 10,
-        10, 10, -10, -10, 20, 0, 0, 0, 0, 20, -10, -20, -10, -10, -10, -10, -10, -10, -20,
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  5,  0,  0,  0,  0,  5,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20,
     ];
     pub static ref BISHOP_VALUE_PER_SQUARE_BLACK: Vec<isize> = BISHOP_VALUE_PER_SQUARE_WHITE
         .iter()
@@ -55,9 +68,14 @@ lazy_static::lazy_static! {
             .rev()
             .collect();
     pub static ref QUEEN_VALUE_PER_SQUARE_WHITE: Vec<isize> = vec![
-        -20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 5, 5, 5, 0,
-        -10, -5, 0, 5, 5, 5, 5, 0, -5, 0, 0, 5, 5, 5, 5, 0, -5, -10, 5, 5, 5, 5, 5, 0, -10, -10, 0,
-        5, 0, 0, 0, 0, -10, -20, -10, -10, -5, -5, -10, -10, -20
+        -20,-10,-10, -5, -5,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5,  5,  5,  5,  0,-10,
+         -5,  0,  5,  5,  5,  5,  0, -5,
+          0,  0,  5,  5,  5,  5,  0, -5,
+        -10,  5,  5,  5,  5,  5,  0,-10,
+        -10,  0,  5,  0,  0,  0,  0,-10,
+        -20,-10,-10, -5, -5,-10,-10,-20
     ];
     pub static ref QUEEN_VALUE_PER_SQUARE_BLACK: Vec<isize> =
         QUEEN_VALUE_PER_SQUARE_WHITE.iter().copied().rev().collect();
@@ -115,6 +133,7 @@ const fn reverse<const N: usize>(arr: [isize; N]) -> [isize; N] {
     }
     reversed
 }
+
 pub const KING_MIDDLE_WHITE: [isize; 64] = [
     -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40,
     -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30, -20, -30, -30, -40, -40, -30,
@@ -131,3 +150,5 @@ pub const KING_ENDGAME_WHITE: [isize; 64] = [
     -30, -50,
 ];
 pub const KING_ENDGAME_BLACK: [isize; 64] = reverse(KING_ENDGAME_WHITE);
+
+pub const INITIAL_BOARD_VALUE: u16 = 23_900;
