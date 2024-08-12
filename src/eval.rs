@@ -1,8 +1,6 @@
 use std::str::FromStr;
 
-use crate::{
-    engine::GamePhases, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
-};
+use crate::{BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
 use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
@@ -23,23 +21,11 @@ pub enum EvalFlags {
 
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
-    flags: &'a [EvalFlags],
-    phases: GamePhases,
 }
 
 impl<'a> Evaluation<'a> {
     pub fn new(engine_side: &'a Board) -> Self {
-        Self {
-            engine_side,
-            flags: &[
-                EvalFlags::KingSafety,
-                EvalFlags::Mobility,
-                EvalFlags::PieceCount,
-                EvalFlags::PieceSquare,
-                EvalFlags::FavourBishopPairs,
-            ],
-            phases: Default::default(),
-        }
+        Self { engine_side }
     }
 
     pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {
@@ -171,10 +157,14 @@ impl<'a> Evaluation<'a> {
 
             if let (Some(piece), Some(color)) = (piece, color) {
                 let piece_value = match piece {
-                    chess::Piece::Pawn => match color {
-                        Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
-                        Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    },
+                    chess::Piece::Pawn => {
+                        let f = self.pass_pawn(board, square, color);
+                        value_based_on_pos += f;
+                        match color {
+                            Color::White => PAWN_VALUE_PER_SQUARE_WHITE[x as usize],
+                            Color::Black => PAWN_VALUE_PER_SQUARE_BLACK[x as usize],
+                        }
+                    }
                     chess::Piece::Knight => match color {
                         Color::White => KNIGHT_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => KNIGHT_VALUE_PER_SQUARE_BLACK[x as usize],
@@ -191,10 +181,10 @@ impl<'a> Evaluation<'a> {
                         Color::White => ROOK_VALUE_PER_SQUARE_WHITE[x as usize],
                         Color::Black => ROOK_VALUE_PER_SQUARE_BLACK[x as usize],
                     },
-                    // chess::Piece::Queen => match color {
-                    //     Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
-                    //     Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
-                    // },
+                    chess::Piece::Queen => match color {
+                        Color::White => QUEEN_VALUE_PER_SQUARE_WHITE[x as usize],
+                        Color::Black => QUEEN_VALUE_PER_SQUARE_BLACK[x as usize],
+                    },
                     _ => 0,
                 };
 
