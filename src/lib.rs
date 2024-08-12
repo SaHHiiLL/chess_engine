@@ -84,9 +84,7 @@ mod tests {
     fn bench_eval_board(b: &mut Bencher) {
         b.iter(|| {
             let engine = Engine::from_str(&FEN_STRING[0]).unwrap();
-            engine
-                .evaluation()
-                .eval_board(engine.board(), engine.history());
+            Evaluation::new(&engine.board()).eval_board(engine.board(), engine.history());
         })
     }
 
