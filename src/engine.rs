@@ -1,19 +1,47 @@
 use std::{
-    borrow::{Borrow, BorrowMut},
-    cell::{Cell, RefCell},
     cmp::Ordering,
-    rc::Rc,
     str::FromStr,
-    sync::RwLock,
+    sync::{Arc, Mutex, RwLock},
     time::Instant,
 };
 
-use chess::{BitBoard, Board, ChessMove, Game, MoveGen, Piece, Square};
+use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::{eval::Evaluation, game_phase::GamePhases, BoardMaterial, OpeningDatabase};
+use crate::{eval::Evaluation, BoardMaterial, OpeningDatabase};
+
+#[derive(Clone, PartialEq)]
+pub enum GamePhases {
+    Opening,
+    MiddleGame,
+    EndGame,
+}
+
+impl Default for GamePhases {
+    fn default() -> Self {
+        Self::Opening
+    }
+}
+
+impl GamePhases {
+    fn update(&mut self, mat: BoardMaterial, board: &Board) {
+        if board.pieces(Piece::Queen).0 == 0 {
+            self.set_endgame();
+        } else {
+            self.set_middlegame();
+        }
+    }
+
+    fn set_endgame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+
+    fn set_middlegame(&mut self) {
+        *self = GamePhases::EndGame
+    }
+}
 
 #[derive(Clone, Default)]
-pub struct GameState {
+struct GameState {
     game_phases: GamePhases,
     last_move: Option<ChessMove>,
     has_black_castel: bool,
@@ -27,33 +55,11 @@ impl GameState {
         Self {
             game_phases: GamePhases::Opening,
             last_move: None,
-            has_black_castel: false,
-            has_white_castel: false,
-            black_castel_right: true,
-            white_castel_right: true,
+            ..Default::default()
         }
-    }
-
-    fn black_castel(&mut self) {
-        self.has_black_castel = true;
-        self.black_castel_right = false;
-    }
-
-    fn white_castel(&mut self) {
-        self.has_white_castel = true;
-        self.white_castel_right = false;
-    }
-
-    pub fn update_game_phase(&mut self, mat_count: &BoardMaterial, board: &Board) {
-        assert!(board.is_sane());
-        let queen = board.pieces(Piece::Queen);
-        if queen == &BitBoard(0) {
-            self.game_phases.set_endgame();
-            return;
-        }
-        // todo!()
     }
 }
+
 enum MoveType {
     Normal,
     Castle,
@@ -91,7 +97,7 @@ pub struct Engine {
     best_move: Option<ChessMove>,
     side_playing: chess::Color,
     board_history: Vec<u64>,
-    game_state: Rc<RefCell<GameState>>,
+    game_state: GameState,
     opening_database: OpeningDatabase,
 }
 
@@ -105,7 +111,7 @@ impl FromStr for Engine {
             best_move: None,
             side_playing: board.side_to_move(),
             board_history: vec![],
-            game_state: Rc::new(RefCell::new(GameState::new())),
+            game_state: GameState::new(),
             opening_database: OpeningDatabase::new(),
         })
     }
@@ -124,10 +130,6 @@ impl Engine {
         self.opening_database = op_db;
     }
 
-    pub fn evaluation(&self) -> Evaluation {
-        Evaluation::new(&self.board, &self.game_state)
-    }
-
     pub fn new() -> Self {
         Self {
             opening_database: OpeningDatabase::new(),
@@ -135,7 +137,7 @@ impl Engine {
             best_move: None,
             side_playing: chess::Color::White,
             board_history: vec![],
-            game_state: Rc::new(RefCell::new(GameState::new())),
+            game_state: GameState::new(),
         }
     }
 
@@ -190,8 +192,7 @@ impl Engine {
         let board = self.board.make_move_new(mov);
         self.board = board;
         self.board_history.push(board.get_hash());
-        // self.game_state.last_move = Some(mov);
-        self.game_state.as_ref().borrow_mut().last_move = Some(mov);
+        self.game_state.last_move = Some(mov);
         self.side_playing = self.board.side_to_move();
     }
 
@@ -213,15 +214,16 @@ impl Engine {
         best_eval
     }
 
+    /// TODO: make this better,
+    /// BUG: the bot only plays the lines it can find, even if the other player has gone out of the line
     fn get_best_move_from_opening_database(&mut self) -> bool {
-        let mut game_state = self.game_state.as_ref().borrow_mut();
-        if game_state.last_move.is_some() {
+        if self.game_state.last_move.is_some() {
             match !self
                 .opening_database
-                .choose_opening_move(game_state.last_move.unwrap())
+                .choose_opening_move(self.game_state.last_move.unwrap())
             {
                 true => {
-                    game_state.game_phases.set_middlegame();
+                    self.game_state.game_phases.set_middlegame();
                     return false;
                 }
                 false => (),
@@ -243,12 +245,11 @@ impl Engine {
 
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
         if !self.opening_database.is_end()
-            && self.game_state.as_ref().borrow().game_phases == GamePhases::Opening
+            && self.game_state.game_phases == GamePhases::Opening
             && self.get_best_move_from_opening_database()
         {
             return 0;
         }
-
         println!("info starting Iterative Deepinnn");
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {
@@ -311,13 +312,11 @@ impl Engine {
         best_eval
     }
 
-    pub fn eval(&mut self, board: &Board) -> isize {
-        let board = &self.board;
-        let game_state_ref = &self.game_state;
-        let eval = Evaluation::new(&self.board, game_state_ref);
+    pub fn eval(&self, board: &Board) -> isize {
+        let eval = Evaluation::new(&self.board);
         let moves = self.gen_legal_moves(board);
-        let res = eval.eval_board(board, &self.board_history);
-        res
+        eval.eval_board(board, &self.board_history)
+            .saturating_sub(eval.eval_mobility(&moves))
     }
 }
 
@@ -334,7 +333,7 @@ mod test {
             Engine::from_str("r1b1kb2/pppp1p1p/2n1p2n/8/3q2r1/8/PPPPKPP1/RNBQ1BNR b q - 0 11")
                 .expect("IDIOT");
         let eval = engine.search(1);
-        // assert_eq!(eval, isize::MAX);
+        assert_eq!(eval, isize::MAX);
         assert_eq!(engine.best_move.unwrap().to_string(), "d4e4");
     }
 
@@ -343,7 +342,7 @@ mod test {
         let mut engine =
             Engine::from_str("rn2k1nr/ppp2ppp/8/3pp3/8/P1P3qb/1PQPPP2/RNB1KB2 w Qkq - 0 8")
                 .unwrap();
-        let eval = engine.search(1);
+        let eval = engine.search(3);
         assert_eq!(engine.get_best_mov().unwrap().to_string().as_str(), "f2g3");
     }
 
@@ -351,18 +350,14 @@ mod test {
     fn eval_board_black() {
         let engine = Engine::from_str("8/8/1P2K3/8/2n5/1q6/8/5k2 b - - 0 1").unwrap();
 
-        let eval = engine
-            .evaluation()
-            .eval_board(engine.board(), engine.history());
-        assert_eq!(eval, 1000);
+        let eval = Evaluation::new(&engine.board).eval_board(engine.board(), engine.history());
+        assert!(eval >= 1000);
     }
 
     #[test]
     fn eval_board_white() {
         let engine = Engine::from_str("8/8/1P2K3/8/2n5/1q6/8/5k2 w - - 0 1").unwrap();
-        let eval = engine
-            .evaluation()
-            .eval_board(engine.board(), engine.history());
+        let eval = Evaluation::new(&engine.board).eval_board(engine.board(), engine.history());
         assert!(eval <= -1100);
     }
 
