@@ -89,6 +89,11 @@ impl<'a> Evaluation<'a> {
         }
     }
 
+    /// returns a bitboard with only just the single file being turned on
+    fn file_bitboard(&self, file_idx: usize) -> BitBoard {
+        BitBoard(72340172838076673 << file_idx)
+    }
+
     /// creates a bitmask to check if a pawn can be considered as passed pawned or not
     fn pass_pawn_bitmask_black(&self, square: Square) -> BitBoard {
         let a_file: u64 = 72340172838076673;

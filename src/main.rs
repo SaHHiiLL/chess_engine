@@ -35,7 +35,9 @@ fn main() {
             "1. e4 e6 2. h4 h6 3. d4 d5 4. Nc3 Bb4 5. e5 c5 6. a3 Bxc3+ 7. bxc3 Ne7 8. Qg4 Qa5 9. Bd2 Rg8 10. Bd3 Nf5 11. Ne2 Qa4 12. Rb1 c4 13. Bxf5 exf5 14. Qf3 Qxc2 15. Rb5 Be6 16. Nf4 Qe4+ 17. Qxe4 fxe4 18. Nxd5 a6",
             "1. d4 d5 2. Nc3 Nf6 3. Bf4 e6 4. Nb5 Na6 5. e3 Bb4+ 6. c3 Be7 7. a4 O-O 8. Bd3 c6 9. Na3 c5 10. Nf3 Ne4 ",
             "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. Bc4 Nb6 5. e6 Nxc4 6. exf7+ Kxf7 7. Qf3+ Ke8 8. Qh5+ g6 9. Qb5+ Qd7 10. Qxc4 Qe6+ ",
-            "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. c4 Nb6 5. exd6 cxd6 6. Nf3 g6 7. Nc3 Bg7 8. h3 O-O 9. Be2 Nc6 10. O-O Bf5"
+            "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. c4 Nb6 5. exd6 cxd6 6. Nf3 g6 7. Nc3 Bg7 8. h3 O-O 9. Be2 Nc6 10. O-O Bf5",
+            "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6 9. Nbd2 Be7 10. c3 O-O 11. Bc2 f5",
+            "1. e4 c5 2. Nf3 Nc6 3. Bb5 e6 4. Bxc6 bxc6 5. d3 Ne7 6. Qe2 f6 7. Nh4 g6 8. f4 Bg7 9. O-O O-O",
         ];
         let mut opening_database = OpeningDatabase::new();
         op.iter()

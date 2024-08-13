@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use chess::{Board, ChessMove, Color, MoveGen, Piece, Square};
+use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{eval::Evaluation, game_phase::GamePhases, BoardMaterial, OpeningDatabase};
 
@@ -45,19 +45,6 @@ trait PieceOnBoardExt {
 impl PieceOnBoardExt for Board {
     fn get_piece(&self, sq: Square) -> Option<(chess::Piece, chess::Color)> {
         Some((self.piece_on(sq)?, self.color_on(sq)?))
-    }
-}
-
-/// Gets the piece the move
-trait MovePiecesExt {
-    fn move_type(&self, chess_move: &ChessMove);
-}
-
-impl MovePiecesExt for Board {
-    fn move_type(&self, chess_move: &ChessMove) {
-        let source = chess_move.get_source();
-        let dest = chess_move.get_dest();
-        todo!()
     }
 }
 
@@ -119,6 +106,17 @@ impl Engine {
     /// this will help the `alpha-beta` pruning
     fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove]) {
         moves.sort_by(|d: &ChessMove, other: &ChessMove| {
+            if self.game_state.game_phases == GamePhases::EndGame {
+                let other_board = board.make_move_new(*other);
+                if other_board.checkers() != &BitBoard(0) {
+                    return Ordering::Greater;
+                }
+                let curr_board = board.make_move_new(*d);
+                if curr_board.checkers() != &BitBoard(0) {
+                    return Ordering::Less;
+                }
+            }
+
             let square: Square = d.get_dest();
             let piece = board.piece_on(square);
 
