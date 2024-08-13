@@ -1,6 +1,8 @@
-use std::str::FromStr;
+use std::{cell::RefCell, rc::Rc, str::FromStr};
 
-use crate::{BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE};
+use crate::{
+    game_state::GameState, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
+};
 use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
@@ -21,11 +23,15 @@ pub enum EvalFlags {
 
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
+    game_state: &'a Rc<RefCell<GameState>>,
 }
 
 impl<'a> Evaluation<'a> {
-    pub fn new(engine_side: &'a Board) -> Self {
-        Self { engine_side }
+    pub fn new(engine_side: &'a Board, game_state: &'a Rc<RefCell<GameState>>) -> Self {
+        Self {
+            engine_side,
+            game_state,
+        }
     }
 
     pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {
@@ -141,7 +147,7 @@ impl<'a> Evaluation<'a> {
         res
     }
 
-    pub fn eval_board(&self, board: &Board, board_history: &[u64]) -> isize {
+    pub fn eval_board(&mut self, board: &Board, board_history: &[u64]) -> isize {
         // if the position has been reached before at least 3 times it will be draw by three-fold
         // repetition
         let repeat_board = board_history
@@ -210,10 +216,16 @@ impl<'a> Evaluation<'a> {
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
 
+                let mut game_state = self.game_state.as_ref().borrow_mut();
+                game_state.update_game_phase(board_sum, board);
+
                 if board.side_to_move() != self.engine_side.side_to_move() {
                     -eval
+                        .saturating_sub(value_based_on_pos)
+                        .saturating_add(self.favour_bishop_pair(board))
                 } else {
-                    eval
+                    eval.saturating_add(value_based_on_pos)
+                        .saturating_sub(self.favour_bishop_pair(board))
                 }
             }
             chess::BoardStatus::Stalemate => 0,
@@ -225,9 +237,20 @@ impl<'a> Evaluation<'a> {
                 }
             }
         };
+
         mat_val
-            .saturating_add(value_based_on_pos)
-            .saturating_add(self.favour_bishop_pair(board))
+        //     .saturating_add(value_based_on_pos)
+        //     .saturating_add(self.favour_bishop_pair(board))
+    }
+
+    fn final_add_neg(&self, mut initial: isize, pos: &[isize], negs: &[isize]) -> isize {
+        for x in pos.iter() {
+            initial = initial.saturating_add(*x);
+        }
+        for x in pos.iter() {
+            initial = initial.saturating_sub(*x);
+        }
+        initial
     }
 
     pub fn eval_mobility(&self, moves: &[ChessMove]) -> isize {

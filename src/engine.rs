@@ -1,5 +1,7 @@
 use std::{
+    cell::RefCell,
     cmp::Ordering,
+    rc::Rc,
     str::FromStr,
     sync::{Arc, Mutex, RwLock},
     time::Instant,
@@ -7,27 +9,9 @@ use std::{
 
 use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
-use crate::{eval::Evaluation, game_phase::GamePhases, BoardMaterial, OpeningDatabase};
-
-#[derive(Clone, Default)]
-struct GameState {
-    game_phases: GamePhases,
-    last_move: Option<ChessMove>,
-    has_black_castel: bool,
-    has_white_castel: bool,
-    black_castel_right: bool,
-    white_castel_right: bool,
-}
-
-impl GameState {
-    fn new() -> Self {
-        Self {
-            game_phases: GamePhases::Opening,
-            last_move: None,
-            ..Default::default()
-        }
-    }
-}
+use crate::{
+    eval::Evaluation, game_phase::GamePhases, game_state::GameState, BoardMaterial, OpeningDatabase,
+};
 
 enum MoveType {
     Normal,
@@ -53,7 +37,7 @@ pub struct Engine {
     best_move: Option<ChessMove>,
     side_playing: chess::Color,
     board_history: Vec<u64>,
-    game_state: GameState,
+    game_state: Rc<RefCell<GameState>>,
     opening_database: OpeningDatabase,
 }
 
@@ -67,7 +51,7 @@ impl FromStr for Engine {
             best_move: None,
             side_playing: board.side_to_move(),
             board_history: vec![],
-            game_state: GameState::new(),
+            game_state: Rc::new(RefCell::new(GameState::new())),
             opening_database: OpeningDatabase::new(),
         })
     }
@@ -93,7 +77,7 @@ impl Engine {
             best_move: None,
             side_playing: chess::Color::White,
             board_history: vec![],
-            game_state: GameState::new(),
+            game_state: Rc::new(RefCell::new(GameState::new())),
         }
     }
 
@@ -106,7 +90,7 @@ impl Engine {
     /// this will help the `alpha-beta` pruning
     fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove]) {
         moves.sort_by(|d: &ChessMove, other: &ChessMove| {
-            if self.game_state.game_phases == GamePhases::EndGame {
+            if self.game_state.as_ref().borrow().game_phases() == &GamePhases::EndGame {
                 let other_board = board.make_move_new(*other);
                 if other_board.checkers() != &BitBoard(0) {
                     return Ordering::Greater;
@@ -159,7 +143,7 @@ impl Engine {
         let board = self.board.make_move_new(mov);
         self.board = board;
         self.board_history.push(board.get_hash());
-        self.game_state.last_move = Some(mov);
+        self.game_state.borrow_mut().set_lastmove(mov);
         self.side_playing = self.board.side_to_move();
     }
 
@@ -184,13 +168,14 @@ impl Engine {
     /// TODO: make this better,
     /// BUG: the bot only plays the lines it can find, even if the other player has gone out of the line
     fn get_best_move_from_opening_database(&mut self) -> bool {
-        if self.game_state.last_move.is_some() {
+        let mut game_state = self.game_state.as_ref().borrow_mut();
+        if game_state.last_move().is_some() {
             match !self
                 .opening_database
-                .choose_opening_move(self.game_state.last_move.unwrap())
+                .choose_opening_move(game_state.last_move().unwrap())
             {
                 true => {
-                    self.game_state.game_phases.set_middlegame();
+                    game_state.set_gamephases_middlegame();
                     return false;
                 }
                 false => (),
@@ -211,8 +196,9 @@ impl Engine {
     }
 
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
+        let mut game_state = self.game_state.as_ref().borrow_mut().game_phases().clone();
         if !self.opening_database.is_end()
-            && self.game_state.game_phases == GamePhases::Opening
+            && game_state == GamePhases::Opening
             && self.get_best_move_from_opening_database()
         {
             return 0;
@@ -280,7 +266,7 @@ impl Engine {
     }
 
     pub fn eval(&self, board: &Board) -> isize {
-        let eval = Evaluation::new(&self.board);
+        let mut eval = Evaluation::new(&self.board, &self.game_state);
         let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
             .saturating_sub(eval.eval_mobility(&moves))
