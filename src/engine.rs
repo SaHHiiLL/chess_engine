@@ -37,7 +37,7 @@ pub struct Engine {
     best_move: Option<ChessMove>,
     side_playing: chess::Color,
     board_history: Vec<u64>,
-    game_state: Rc<RefCell<GameState>>,
+    game_state: GameState,
     opening_database: OpeningDatabase,
 }
 
@@ -51,7 +51,7 @@ impl FromStr for Engine {
             best_move: None,
             side_playing: board.side_to_move(),
             board_history: vec![],
-            game_state: Rc::new(RefCell::new(GameState::new())),
+            game_state: GameState::new(),
             opening_database: OpeningDatabase::new(),
         })
     }
@@ -77,7 +77,7 @@ impl Engine {
             best_move: None,
             side_playing: chess::Color::White,
             board_history: vec![],
-            game_state: Rc::new(RefCell::new(GameState::new())),
+            game_state: GameState::new(),
         }
     }
 
@@ -88,9 +88,14 @@ impl Engine {
     /// Sorts moves based on if the move captures a piece or does a promotion
     /// if a move is a capture or promotion it will be sent higher in the list
     /// this will help the `alpha-beta` pruning
-    fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove]) {
+    fn sort_moves_in_place(
+        &self,
+        board: &Board,
+        moves: &mut [ChessMove],
+        game_state: &Rc<RefCell<GameState>>,
+    ) {
         moves.sort_by(|d: &ChessMove, other: &ChessMove| {
-            if self.game_state.as_ref().borrow().game_phases() == &GamePhases::EndGame {
+            if game_state.as_ref().borrow().game_phases() == &GamePhases::EndGame {
                 let other_board = board.make_move_new(*other);
                 if other_board.checkers() != &BitBoard(0) {
                     return Ordering::Greater;
@@ -143,19 +148,26 @@ impl Engine {
         let board = self.board.make_move_new(mov);
         self.board = board;
         self.board_history.push(board.get_hash());
-        self.game_state.borrow_mut().set_lastmove(mov);
+        self.game_state.set_lastmove(mov);
         self.side_playing = self.board.side_to_move();
     }
 
-    pub fn search(&mut self, depth: usize) -> isize {
+    pub fn search(&mut self, depth: usize, game_state: GameState) -> isize {
+        let game_state = Rc::new(RefCell::new(game_state));
         let legal_moves = self.gen_legal_moves(&self.board);
         let mut best_eval = -isize::MAX;
 
         for m in legal_moves.iter() {
             // make the move
             let next_board = self.board.make_move_new(*m);
-            let next_eval =
-                self.search_alpha_beta(depth, &next_board, -isize::MAX, isize::MAX, false);
+            let next_eval = self.search_alpha_beta(
+                depth,
+                &next_board,
+                -isize::MAX,
+                isize::MAX,
+                false,
+                &game_state,
+            );
 
             if next_eval > best_eval || self.best_move.is_none() {
                 best_eval = next_eval;
@@ -168,14 +180,13 @@ impl Engine {
     /// TODO: make this better,
     /// BUG: the bot only plays the lines it can find, even if the other player has gone out of the line
     fn get_best_move_from_opening_database(&mut self) -> bool {
-        let mut game_state = self.game_state.as_ref().borrow_mut();
-        if game_state.last_move().is_some() {
+        if self.game_state.last_move().is_some() {
             match !self
                 .opening_database
-                .choose_opening_move(game_state.last_move().unwrap())
+                .choose_opening_move(self.game_state.last_move().unwrap())
             {
                 true => {
-                    game_state.set_gamephases_middlegame();
+                    self.game_state.set_gamephases_middlegame();
                     return false;
                 }
                 false => (),
@@ -196,9 +207,9 @@ impl Engine {
     }
 
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
-        let mut game_state = self.game_state.as_ref().borrow_mut().game_phases().clone();
+        let mut game_state = self.game_state.game_phases();
         if !self.opening_database.is_end()
-            && game_state == GamePhases::Opening
+            && *game_state == GamePhases::Opening
             && self.get_best_move_from_opening_database()
         {
             return 0;
@@ -207,11 +218,12 @@ impl Engine {
         let mut best_eval = -isize::MAX;
         for x in 1..usize::MAX {
             let now = Instant::now();
+            let game_state = self.game_state.clone();
             println!("info depth {}", x);
             if now >= search_cancel_time {
                 break;
             }
-            let eval = self.search(x);
+            let eval = self.search(x, game_state);
             best_eval = best_eval.max(eval);
         }
         best_eval
@@ -224,9 +236,10 @@ impl Engine {
         mut alpha: isize,
         mut beta: isize,
         is_maximizing: bool,
+        game_state: &Rc<RefCell<GameState>>,
     ) -> isize {
         if depth == 0 {
-            return self.eval(board);
+            return self.eval(board, game_state);
         }
 
         let mut best_eval = if is_maximizing {
@@ -237,16 +250,23 @@ impl Engine {
         // Move Ordering based on -- if a piece can be captured from the move it can be a good move
         // thus should be looked before
         let mut moves = self.gen_legal_moves(board);
-        self.sort_moves_in_place(board, &mut moves);
+        self.sort_moves_in_place(board, &mut moves, game_state);
         let moves = moves;
         if moves.is_empty() {
-            return self.eval(board);
+            return self.eval(board, game_state);
         }
 
         for m in moves.iter() {
             // make the move
             let next_board = board.make_move_new(*m);
-            let eval = self.search_alpha_beta(depth - 1, &next_board, alpha, beta, !is_maximizing);
+            let eval = self.search_alpha_beta(
+                depth - 1,
+                &next_board,
+                alpha,
+                beta,
+                !is_maximizing,
+                game_state,
+            );
 
             if is_maximizing {
                 best_eval = best_eval.max(eval);
@@ -265,8 +285,8 @@ impl Engine {
         best_eval
     }
 
-    pub fn eval(&self, board: &Board) -> isize {
-        let mut eval = Evaluation::new(&self.board, &self.game_state);
+    pub fn eval(&self, board: &Board, game_state: &Rc<RefCell<GameState>>) -> isize {
+        let mut eval = Evaluation::new(&self.board, game_state);
         let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
             .saturating_sub(eval.eval_mobility(&moves))

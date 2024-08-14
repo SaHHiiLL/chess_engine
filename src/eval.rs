@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc, str::FromStr};
 
 use crate::{
-    game_state::GameState, BoardMaterial, MaterialSumExt, KING_MIDDLE_BLACK, KING_MIDDLE_WHITE,
+    game_state::GameState, BoardMaterial, MaterialSumExt, PieceFromColor, KING_MIDDLE_BLACK,
+    KING_MIDDLE_WHITE,
 };
 use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
@@ -25,6 +26,8 @@ pub struct Evaluation<'a> {
     engine_side: &'a Board,
     game_state: &'a Rc<RefCell<GameState>>,
 }
+
+//TODO: make a game result enum for checkmate that has move count for checkmate
 
 impl<'a> Evaluation<'a> {
     pub fn new(engine_side: &'a Board, game_state: &'a Rc<RefCell<GameState>>) -> Self {
@@ -133,18 +136,16 @@ impl<'a> Evaluation<'a> {
         if b_p.0 == 0 {
             return 0;
         }
-        let mut res = 0;
         let color_bp = match board.side_to_move() {
             Color::White => board.color_combined(Color::White) & b_p,
             Color::Black => board.color_combined(Color::Black) & b_p,
         };
 
         if (board.side_to_move() == self.engine_side.side_to_move()) && color_bp.count() == 2 {
-            res += 10;
+            10
         } else {
-            res -= 10;
+            -10
         }
-        res
     }
 
     pub fn eval_board(&mut self, board: &Board, board_history: &[u64]) -> isize {
@@ -216,16 +217,29 @@ impl<'a> Evaluation<'a> {
                     Color::Black => board_sum.black as isize - board_sum.white as isize,
                 };
 
+                // game state is updated
                 let mut game_state = self.game_state.as_ref().borrow_mut();
                 game_state.update_game_phase(board_sum, board);
 
+                let mut eval = eval
+                    .saturating_sub(self.favour_bishop_pair(board))
+                    .saturating_add(value_based_on_pos);
+
+                if game_state.game_phases().is_end() {
+                    // check if king is in check -- give incentive
+                    if board.checkers() != &BitBoard(0)
+                        && self.engine_side.side_to_move() != board.side_to_move()
+                    {
+                        eval = eval.saturating_add(20);
+                    }
+
+                    eval = eval.saturating_add(self.push_enemy_king_to_edge(board));
+                }
+
                 if board.side_to_move() != self.engine_side.side_to_move() {
                     -eval
-                        .saturating_sub(value_based_on_pos)
-                        .saturating_add(self.favour_bishop_pair(board))
                 } else {
-                    eval.saturating_add(value_based_on_pos)
-                        .saturating_sub(self.favour_bishop_pair(board))
+                    eval
                 }
             }
             chess::BoardStatus::Stalemate => 0,
@@ -239,21 +253,34 @@ impl<'a> Evaluation<'a> {
         };
 
         mat_val
-        //     .saturating_add(value_based_on_pos)
-        //     .saturating_add(self.favour_bishop_pair(board))
-    }
-
-    fn final_add_neg(&self, mut initial: isize, pos: &[isize], negs: &[isize]) -> isize {
-        for x in pos.iter() {
-            initial = initial.saturating_add(*x);
-        }
-        for x in pos.iter() {
-            initial = initial.saturating_sub(*x);
-        }
-        initial
     }
 
     pub fn eval_mobility(&self, moves: &[ChessMove]) -> isize {
         moves.len().saturating_mul(2).try_into().unwrap()
     }
+
+    /// --- END GAME SPECIFIC --- ///
+
+    fn rook_on_same_rank(&self, board: &Board) -> isize {
+        todo!()
+    }
+
+    /// return a positive value if king is in edge of the board or returns a negative value if not
+    fn push_enemy_king_to_edge(&self, board: &Board) -> isize {
+        let edge_bitboard = BitBoard(0xff818181818181ff);
+        let enemy_color = match self.engine_side.side_to_move() {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+        };
+        let enemy_king = board.pieces_color(Piece::King, enemy_color);
+        assert_eq!(enemy_king.0.count_ones(), 1);
+        let enemy_king_square = enemy_king.to_square();
+        KING_EDGE[enemy_king_square.to_index()]
+    }
 }
+
+pub const KING_EDGE: &[isize; 64] = &[
+    16, 16, 16, 16, 16, 16, 16, 16, 16, 14, 14, 14, 14, 14, 14, 16, 16, 14, -10, -10, -10, -10, 14,
+    16, 16, 14, -10, -20, -20, -10, 14, 16, 16, 14, -10, -20, -20, -20, 14, 16, 16, 14, -10, -10,
+    -10, -10, 14, 16, 16, 14, 14, 14, 14, 14, 14, 16, 16, 14, 14, 14, 14, 14, 14, 16,
+];

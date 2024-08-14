@@ -1,6 +1,6 @@
 #![feature(test)]
 #![allow(warnings)]
-use chess::{Board, Color, Square};
+use chess::{BitBoard, Board, Color, Piece, Square};
 pub(crate) mod consts;
 pub(crate) mod engine;
 pub(crate) mod eval;
@@ -13,6 +13,27 @@ pub mod uci;
 pub use consts::*;
 pub use opening::OpeningDatabase;
 pub use uci::*;
+
+pub trait PieceFromColor {
+    fn pieces_white(&self, piece: Piece) -> BitBoard;
+    fn pieces_black(&self, piece: Piece) -> BitBoard;
+    fn pieces_color(&self, piece: Piece, color: Color) -> BitBoard {
+        match color {
+            Color::White => self.pieces_white(piece),
+            Color::Black => self.pieces_black(piece),
+        }
+    }
+}
+
+impl PieceFromColor for Board {
+    fn pieces_white(&self, piece: Piece) -> BitBoard {
+        BitBoard::from(self.pieces(piece) & self.color_combined(Color::White))
+    }
+
+    fn pieces_black(&self, piece: Piece) -> BitBoard {
+        BitBoard::from(self.pieces(piece) & self.color_combined(Color::Black))
+    }
+}
 
 pub struct BoardMaterial {
     pub white: u32,
