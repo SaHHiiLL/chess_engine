@@ -4,6 +4,7 @@ use chess::{BitBoard, Board, Color, Piece, Square};
 pub(crate) mod consts;
 pub(crate) mod engine;
 pub(crate) mod eval;
+pub(crate) mod evaluation_value;
 pub(crate) mod game_phase;
 pub(crate) mod game_state;
 pub(crate) mod opening;

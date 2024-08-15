@@ -13,15 +13,6 @@ use crate::{
     ROOK_VALUE_PER_SQUARE_WHITE,
 };
 
-#[derive(Hash, Eq, PartialEq, Debug)]
-pub enum EvalFlags {
-    PieceCount,
-    Mobility,
-    KingSafety,
-    PieceSquare,
-    FavourBishopPairs,
-}
-
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
     game_state: &'a Rc<RefCell<GameState>>,
