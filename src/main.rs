@@ -38,6 +38,7 @@ fn main() {
             "1. e4 Nf6 2. e5 Nd5 3. d4 d6 4. c4 Nb6 5. exd6 cxd6 6. Nf3 g6 7. Nc3 Bg7 8. h3 O-O 9. Be2 Nc6 10. O-O Bf5",
             "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Nxe4 6. d4 b5 7. Bb3 d5 8. dxe5 Be6 9. Nbd2 Be7 10. c3 O-O 11. Bc2 f5",
             "1. e4 c5 2. Nf3 Nc6 3. Bb5 e6 4. Bxc6 bxc6 5. d3 Ne7 6. Qe2 f6 7. Nh4 g6 8. f4 Bg7 9. O-O O-O",
+            "1. e4 d5 2. exd5 Qxd5 3. Nc3 Qa5"
         ];
         let mut opening_database = OpeningDatabase::new();
         op.iter()

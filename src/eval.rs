@@ -91,8 +91,12 @@ impl<'a> Evaluation<'a> {
             Color::Black => self.pass_pawn_bitmask_black(square),
         };
 
-        if (pawn_mask & board.combined()) == chess::BitBoard(0) {
-            15
+        if (pawn_mask & board.combined()).0 == 0 {
+            let rank_bonus = match color {
+                Color::White => &[0, 10, 30, 40, 50, 60, 90, 0],
+                Color::Black => &[0, 90, 60, 50, 40, 30, 10, 0],
+            };
+            15 + rank_bonus[square.get_rank().to_index()]
         } else {
             0
         }
