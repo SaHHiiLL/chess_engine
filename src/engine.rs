@@ -10,7 +10,8 @@ use std::{
 use chess::{BitBoard, Board, ChessMove, Color, MoveGen, Piece, Square};
 
 use crate::{
-    eval::Evaluation, game_phase::GamePhases, game_state::GameState, BoardMaterial, OpeningDatabase,
+    eval::Evaluation, evaluation_value::EvaluationValue, game_phase::GamePhases,
+    game_state::GameState, BoardMaterial, OpeningDatabase,
 };
 
 enum MoveType {
@@ -155,10 +156,10 @@ impl Engine {
         self.side_playing = self.board.side_to_move();
     }
 
-    pub fn search(&mut self, depth: usize, game_state: GameState) -> isize {
+    pub fn search(&mut self, depth: usize, game_state: GameState) -> EvaluationValue {
         let game_state = Rc::new(RefCell::new(game_state));
         let legal_moves = self.gen_legal_moves(&self.board);
-        let mut best_eval = -isize::MAX;
+        let mut best_eval = EvaluationValue::CheckMate(false);
 
         for m in legal_moves.iter() {
             // make the move
@@ -166,8 +167,8 @@ impl Engine {
             let next_eval = self.search_alpha_beta(
                 depth,
                 &next_board,
-                -isize::MAX,
-                isize::MAX,
+                EvaluationValue::CheckMate(false),
+                EvaluationValue::CheckMate(true),
                 false,
                 &game_state,
             );
@@ -206,23 +207,23 @@ impl Engine {
         }
     }
 
-    pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
+    pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> EvaluationValue {
         let mut game_state = self.game_state.game_phases();
         if !self.opening_database.is_end()
             && *game_state == GamePhases::Opening
             && self.get_best_move_from_opening_database()
         {
-            return 0;
+            return 0.into();
         }
         println!("info starting Iterative Deepinnn");
-        let mut best_eval = -isize::MAX;
+        let mut best_eval = EvaluationValue::CheckMate(false);
         for x in 1..usize::MAX {
             let now = Instant::now();
             let game_state = self.game_state.clone();
-            println!("info depth {}", x);
             if now >= search_cancel_time {
                 break;
             }
+            println!("info depth {}", x);
             let eval = self.search(x, game_state);
             best_eval = best_eval.max(eval);
         }
@@ -233,19 +234,19 @@ impl Engine {
         &mut self,
         depth: usize,
         board: &Board,
-        mut alpha: isize,
-        mut beta: isize,
+        mut alpha: EvaluationValue,
+        mut beta: EvaluationValue,
         is_maximizing: bool,
         game_state: &Rc<RefCell<GameState>>,
-    ) -> isize {
+    ) -> EvaluationValue {
         if depth == 0 {
             return self.eval(board, game_state);
         }
 
         let mut best_eval = if is_maximizing {
-            -isize::MAX
+            EvaluationValue::CheckMate(false)
         } else {
-            isize::MAX
+            EvaluationValue::CheckMate(true)
         };
         // Move Ordering based on -- if a piece can be captured from the move it can be a good move
         // thus should be looked before
@@ -285,11 +286,12 @@ impl Engine {
         best_eval
     }
 
-    pub fn eval(&self, board: &Board, game_state: &Rc<RefCell<GameState>>) -> isize {
+    pub fn eval(&self, board: &Board, game_state: &Rc<RefCell<GameState>>) -> EvaluationValue {
         let mut eval = Evaluation::new(&self.board, game_state);
         let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
             .saturating_sub(eval.eval_mobility(&moves))
+            .into()
     }
 }
 

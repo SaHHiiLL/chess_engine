@@ -217,18 +217,22 @@ impl<'a> Evaluation<'a> {
                 game_state.update_game_phase(board_sum, board);
 
                 let mut eval = eval
+                    .saturating_add(self.discourage_queen_as_pinned(board))
                     .saturating_sub(self.favour_bishop_pair(board))
+                    .saturating_sub(self.multiple_pawn_same_file(board))
                     .saturating_add(value_based_on_pos);
 
                 if game_state.game_phases().is_end() {
-                    // check if king is in check -- give incentive
+                    // check if opp king is in check -- give incentive
                     if board.checkers() != &BitBoard(0)
                         && self.engine_side.side_to_move() != board.side_to_move()
                     {
                         eval = eval.saturating_add(20);
                     }
 
-                    eval = eval.saturating_add(self.push_enemy_king_to_edge(board));
+                    eval = eval
+                        .saturating_add(self.rook_on_same_rank(board))
+                        .saturating_sub(self.push_enemy_king_to_edge(board));
                 }
 
                 if board.side_to_move() != self.engine_side.side_to_move() {
@@ -254,16 +258,58 @@ impl<'a> Evaluation<'a> {
         moves.len().saturating_mul(2).try_into().unwrap()
     }
 
+    fn multiple_pawn_same_file(&self, board: &Board) -> isize {
+        let pawn_bitboard = board.pieces_color(Piece::Pawn, board.side_to_move());
+        let mut res: isize = 0;
+        for x in 0..8 {
+            let file_bitboard = self.file_bitboard(x);
+            let pawns = file_bitboard & pawn_bitboard;
+            res *= pawns.0.count_ones() as isize;
+        }
+        res
+    }
+
     /// --- END GAME SPECIFIC --- ///
 
     fn rook_on_same_rank(&self, board: &Board) -> isize {
+        let rooks_bitboard = board.pieces_color(Piece::Rook, board.side_to_move());
+        let mut find = false;
+
+        for x in 0..8 {
+            let file_bitboard = self.file_bitboard(x);
+            let f = file_bitboard | rooks_bitboard;
+            if f == file_bitboard {
+                find = true;
+                break;
+            }
+        }
+
+        if find {
+            15
+        } else {
+            -5
+        }
+    }
+
+    fn discourage_queen_as_pinned(&self, board: &Board) -> isize {
+        let queen_bitboard = board.pieces_color(Piece::Queen, board.side_to_move());
+        let pinned = board.pinned();
+
+        if (pinned & queen_bitboard).0 == 0 {
+            0
+        } else {
+            -20
+        }
+    }
+
+    fn rook_prefer_open_file(&self, board: &Board) -> isize {
         todo!()
     }
 
     /// return a positive value if king is in edge of the board or returns a negative value if not
     fn push_enemy_king_to_edge(&self, board: &Board) -> isize {
         let edge_bitboard = BitBoard(0xff818181818181ff);
-        let enemy_color = match self.engine_side.side_to_move() {
+        let enemy_color = match board.side_to_move() {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };

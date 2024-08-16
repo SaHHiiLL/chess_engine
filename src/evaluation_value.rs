@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-#[derive(Ord, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EvaluationValue {
     Eval(isize),
     // bool represents if the who has been checkmate
@@ -20,42 +20,66 @@ impl From<isize> for EvaluationValue {
     }
 }
 
-impl PartialOrd for EvaluationValue {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+impl Ord for EvaluationValue {
+    fn cmp(&self, other: &Self) -> Ordering {
         match (other, self) {
             (EvaluationValue::Eval(other_eval), EvaluationValue::Eval(self_eval)) => {
-                let d = if other_eval > self_eval {
-                    Ordering::Greater
-                } else if other_eval < self_eval {
+                if other_eval > self_eval {
                     Ordering::Less
+                } else if other_eval < self_eval {
+                    Ordering::Greater
                 } else {
                     Ordering::Equal
-                };
-                Some(d)
+                }
             }
             (EvaluationValue::Eval(other_eval), EvaluationValue::CheckMate(self_mate)) => {
                 if *self_mate == true {
-                    Some(Ordering::Less)
+                    Ordering::Greater
                 } else {
-                    Some(Ordering::Greater)
+                    Ordering::Less
                 }
             }
             (EvaluationValue::CheckMate(other_mate), EvaluationValue::Eval(self_eval)) => {
                 if *other_mate == true {
-                    Some(Ordering::Greater)
+                    Ordering::Less
                 } else {
-                    Some(Ordering::Less)
+                    Ordering::Greater
                 }
             }
             (EvaluationValue::CheckMate(other_mate), EvaluationValue::CheckMate(self_mate)) => {
                 if other_mate == self_mate {
-                    Some(Ordering::Equal)
+                    Ordering::Equal
                 } else if *other_mate == true {
-                    Some(Ordering::Greater)
+                    Ordering::Less
                 } else {
-                    Some(Ordering::Less)
+                    Ordering::Greater
                 }
             }
         }
+    }
+}
+
+impl PartialOrd for EvaluationValue {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::EvaluationValue;
+
+    #[test]
+    fn test_eval_value() {
+        let less = EvaluationValue::CheckMate(false);
+        let more = EvaluationValue::CheckMate(true);
+        assert!(more > less);
+    }
+
+    #[test]
+    fn test_eval_value_1() {
+        let less = EvaluationValue::Eval(-12837);
+        let more = EvaluationValue::CheckMate(true);
+        assert!(more > less);
     }
 }

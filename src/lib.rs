@@ -69,24 +69,23 @@ impl MaterialSumExt for chess::Board {
         let mut mat = BoardMaterial { white: 0, black: 0 };
         let board: &Board = self;
         let pieces = &[
-            chess::Piece::Pawn,
-            chess::Piece::Bishop,
-            chess::Piece::Knight,
-            chess::Piece::King,
-            chess::Piece::Queen,
-            chess::Piece::Rook,
+            (chess::Piece::Pawn, 100),
+            (chess::Piece::Bishop, 330),
+            (chess::Piece::Knight, 300),
+            (chess::Piece::King, 20_000),
+            (chess::Piece::Queen, 900),
+            (chess::Piece::Rook, 500),
         ];
 
         let white_bitboard = board.color_combined(Color::White);
         let black_bitboard = board.color_combined(Color::Black);
 
-        for p in pieces.iter() {
+        for (p, val) in pieces.iter() {
             let piece_bitboard = board.pieces(*p);
             let white_piece = piece_bitboard & white_bitboard;
             let black_piece = piece_bitboard & black_bitboard;
-            let piece_value = PIECE_VALUE_MAP.get(p).expect("YOU IDIOT");
-            mat.white += white_piece.0.count_ones() * *piece_value as u32;
-            mat.black += black_piece.0.count_ones() * *piece_value as u32;
+            mat.white += white_piece.0.count_ones() * *val as u32;
+            mat.black += black_piece.0.count_ones() * *val as u32;
         }
         mat
     }
