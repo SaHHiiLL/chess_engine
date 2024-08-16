@@ -46,11 +46,12 @@ impl FromStr for Engine {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let board = Board::from_str(s)?;
+        let board_history = vec![board.get_hash()];
         Ok(Self {
             board,
             best_move: None,
             side_playing: board.side_to_move(),
-            board_history: vec![],
+            board_history,
             game_state: GameState::new(),
             opening_database: OpeningDatabase::new(),
         })
@@ -71,12 +72,14 @@ impl Engine {
     }
 
     pub fn new() -> Self {
+        let board = Board::default();
+        let board_history = vec![board.get_hash()];
         Self {
             opening_database: OpeningDatabase::new(),
-            board: Board::default(),
+            board,
             best_move: None,
             side_playing: chess::Color::White,
-            board_history: vec![],
+            board_history,
             game_state: GameState::new(),
         }
     }
