@@ -196,17 +196,14 @@ impl Engine {
             }
         }
 
-        let x = self
-            .opening_database
-            .root()
-            .childern()
-            .keys()
-            .next()
-            .unwrap();
-        let _ = self.best_move.insert(*x);
-        self.opening_database
-            .choose_opening_move(self.best_move.expect("SETTING IT RIGHT BEFORE THIS"));
-        true
+        if let Some(x) = self.opening_database.root().childern().keys().next() {
+            let _ = self.best_move.insert(*x);
+            self.opening_database
+                .choose_opening_move(self.best_move.expect("SETTING IT RIGHT BEFORE THIS"));
+            true
+        } else {
+            false
+        }
     }
 
     pub fn search_iterative_deeping(&mut self, search_cancel_time: Instant) -> isize {
