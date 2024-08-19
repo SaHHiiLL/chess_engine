@@ -13,6 +13,11 @@ use crate::{
     ROOK_VALUE_PER_SQUARE_WHITE,
 };
 
+const KING_CASTEL_BONUS: isize = 50;
+const KING_CASTEL_PEN: isize = -30;
+const KING_CASTEL_RIGHT_BONUS: isize = 10;
+const KING_CASTEL_RIGHT_PEN: isize = -10;
+
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
     game_state: &'a Rc<RefCell<GameState>>,
@@ -26,6 +31,43 @@ impl<'a> Evaluation<'a> {
             engine_side,
             game_state,
         }
+    }
+
+    fn king_safety(&self, board: &Board) -> isize {
+        let king_bitboard = board.king_square(board.side_to_move());
+        let game_state = self.game_state.as_ref().borrow();
+        // NOTE: king safety will be evaluated differently for endgame
+        if !game_state.game_phases().is_middle() {
+            return 0;
+        }
+
+        let mut res = 0;
+
+        let king_index = king_bitboard.to_index();
+        assert!(king_index < 64);
+
+        let king_value = match board.side_to_move() {
+            Color::White => KING_MIDDLE_WHITE[king_bitboard.to_index()],
+            Color::Black => KING_MIDDLE_BLACK[king_bitboard.to_index()],
+        };
+        res += king_value;
+
+        // gives a bonus to the king for casteling
+        // if not gives a PEN - gives a further PEN if casteling right is lost
+        if game_state.has_castel(board.side_to_move()) {
+            res += KING_CASTEL_BONUS;
+        } else {
+            res += KING_CASTEL_PEN;
+            if game_state.has_castel_right(board.side_to_move()) {
+                res += KING_CASTEL_RIGHT_BONUS
+            } else {
+                res += KING_CASTEL_RIGHT_PEN
+            }
+        };
+
+        // check pawn_wall above
+
+        res
     }
 
     pub fn is_piece_on_original_pos(&self, piece: &Piece, square: &Square, color: &Color) -> bool {

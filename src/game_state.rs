@@ -21,6 +21,34 @@ impl GameState {
         }
     }
 
+    pub fn has_castel(&self, color: chess::Color) -> bool {
+        match color {
+            chess::Color::White => self.has_white_castel,
+            chess::Color::Black => self.has_black_castel,
+        }
+    }
+
+    pub fn has_opp_castel(&self, color: chess::Color) -> bool {
+        match color {
+            chess::Color::Black => self.has_white_castel,
+            chess::Color::White => self.has_black_castel,
+        }
+    }
+
+    pub fn has_castel_right(&self, color: chess::Color) -> bool {
+        match color {
+            chess::Color::White => self.white_castel_right,
+            chess::Color::Black => self.black_castel_right,
+        }
+    }
+
+    pub fn has_opp_castel_right(&self, color: chess::Color) -> bool {
+        match color {
+            chess::Color::Black => self.white_castel_right,
+            chess::Color::White => self.black_castel_right,
+        }
+    }
+
     pub fn game_phases(&self) -> &GamePhases {
         &self.game_phases
     }

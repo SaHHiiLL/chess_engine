@@ -58,6 +58,9 @@ impl GamePhases {
     pub fn set_endgame(&mut self) {
         *self = GamePhases::EndGame
     }
+    pub fn is_middle(&self) -> bool {
+        *self == GamePhases::MiddleGame
+    }
 
     pub fn is_end(&self) -> bool {
         *self == GamePhases::EndGame
