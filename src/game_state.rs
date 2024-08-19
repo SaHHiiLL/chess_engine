@@ -2,7 +2,7 @@ use chess::{Board, ChessMove};
 
 use crate::{game_phase::GamePhases, BoardMaterial};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct GameState {
     game_phases: GamePhases,
     last_move: Option<ChessMove>,
@@ -19,6 +19,10 @@ impl GameState {
             last_move: None,
             ..Default::default()
         }
+    }
+
+    pub fn update_from_last_move(&mut self) {
+        if let Some(mov) = self.last_move {}
     }
 
     pub fn has_castel(&self, color: chess::Color) -> bool {

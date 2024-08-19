@@ -52,8 +52,6 @@ impl<'a> Evaluation<'a> {
         };
         res += king_value;
 
-        // gives a bonus to the king for casteling
-        // if not gives a PEN - gives a further PEN if casteling right is lost
         if game_state.has_castel(board.side_to_move()) {
             res += KING_CASTEL_BONUS;
         } else {

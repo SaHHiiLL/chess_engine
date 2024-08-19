@@ -92,14 +92,9 @@ impl Engine {
     /// Sorts moves based on if the move captures a piece or does a promotion
     /// if a move is a capture or promotion it will be sent higher in the list
     /// this will help the `alpha-beta` pruning
-    fn sort_moves_in_place(
-        &self,
-        board: &Board,
-        moves: &mut [ChessMove],
-        game_state: &Rc<RefCell<GameState>>,
-    ) {
+    fn sort_moves_in_place(&self, board: &Board, moves: &mut [ChessMove], game_state: &GameState) {
         moves.sort_by(|d: &ChessMove, other: &ChessMove| {
-            if game_state.as_ref().borrow().game_phases() == &GamePhases::EndGame {
+            if game_state.game_phases() == &GamePhases::EndGame {
                 let other_board = board.make_move_new(*other);
                 if other_board.checkers() != &BitBoard(0) {
                     return Ordering::Greater;
@@ -157,20 +152,20 @@ impl Engine {
     }
 
     pub fn search(&mut self, depth: usize, game_state: GameState) -> EvaluationValue {
-        let game_state = Rc::new(RefCell::new(game_state));
         let legal_moves = self.gen_legal_moves(&self.board);
         let mut best_eval = EvaluationValue::CheckMate(false);
 
         for m in legal_moves.iter() {
             // make the move
             let next_board = self.board.make_move_new(*m);
+            self.game_state.set_lastmove(*m);
             let next_eval = self.search_alpha_beta(
                 depth,
                 &next_board,
                 EvaluationValue::CheckMate(false),
                 EvaluationValue::CheckMate(true),
                 false,
-                &game_state,
+                game_state,
             );
 
             if next_eval > best_eval || self.best_move.is_none() {
@@ -237,7 +232,7 @@ impl Engine {
         mut alpha: EvaluationValue,
         mut beta: EvaluationValue,
         is_maximizing: bool,
-        game_state: &Rc<RefCell<GameState>>,
+        mut game_state: GameState,
     ) -> EvaluationValue {
         if depth == 0 {
             return self.eval(board, game_state);
@@ -251,7 +246,7 @@ impl Engine {
         // Move Ordering based on -- if a piece can be captured from the move it can be a good move
         // thus should be looked before
         let mut moves = self.gen_legal_moves(board);
-        self.sort_moves_in_place(board, &mut moves, game_state);
+        self.sort_moves_in_place(board, &mut moves, &game_state);
         let moves = moves;
         if moves.is_empty() {
             return self.eval(board, game_state);
@@ -260,6 +255,7 @@ impl Engine {
         for m in moves.iter() {
             // make the move
             let next_board = board.make_move_new(*m);
+            game_state.set_lastmove(*m);
             let eval = self.search_alpha_beta(
                 depth - 1,
                 &next_board,
@@ -286,8 +282,9 @@ impl Engine {
         best_eval
     }
 
-    pub fn eval(&self, board: &Board, game_state: &Rc<RefCell<GameState>>) -> EvaluationValue {
-        let mut eval = Evaluation::new(&self.board, game_state);
+    pub fn eval(&self, board: &Board, game_state: GameState) -> EvaluationValue {
+        let game_state = Rc::new(RefCell::new(game_state));
+        let mut eval = Evaluation::new(&self.board, &game_state);
         let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
             .saturating_sub(eval.eval_mobility(&moves))

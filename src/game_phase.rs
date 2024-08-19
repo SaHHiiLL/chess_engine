@@ -2,7 +2,7 @@ use chess::{Board, Piece};
 
 use crate::{BoardMaterial, PieceFromColor};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum GamePhases {
     Opening,
     MiddleGame,
