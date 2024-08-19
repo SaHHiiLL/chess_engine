@@ -282,9 +282,8 @@ impl Engine {
         best_eval
     }
 
-    pub fn eval(&self, board: &Board, game_state: GameState) -> EvaluationValue {
-        let game_state = Rc::new(RefCell::new(game_state));
-        let mut eval = Evaluation::new(&self.board, &game_state);
+    pub fn eval(&self, board: &Board, mut game_state: GameState) -> EvaluationValue {
+        let mut eval = Evaluation::new(&self.board, &mut game_state);
         let moves = self.gen_legal_moves(board);
         eval.eval_board(board, &self.board_history)
             .saturating_sub(eval.eval_mobility(&moves))

@@ -20,13 +20,13 @@ const KING_CASTEL_RIGHT_PEN: isize = -10;
 
 pub struct Evaluation<'a> {
     engine_side: &'a Board,
-    game_state: &'a Rc<RefCell<GameState>>,
+    game_state: &'a mut GameState,
 }
 
 //TODO: make a game result enum for checkmate that has move count for checkmate
 
 impl<'a> Evaluation<'a> {
-    pub fn new(engine_side: &'a Board, game_state: &'a Rc<RefCell<GameState>>) -> Self {
+    pub fn new(engine_side: &'a Board, game_state: &'a mut GameState) -> Self {
         Self {
             engine_side,
             game_state,
@@ -35,9 +35,8 @@ impl<'a> Evaluation<'a> {
 
     fn king_safety(&self, board: &Board) -> isize {
         let king_bitboard = board.king_square(board.side_to_move());
-        let game_state = self.game_state.as_ref().borrow();
         // NOTE: king safety will be evaluated differently for endgame
-        if !game_state.game_phases().is_middle() {
+        if !self.game_state.game_phases().is_middle() {
             return 0;
         }
 
@@ -52,11 +51,11 @@ impl<'a> Evaluation<'a> {
         };
         res += king_value;
 
-        if game_state.has_castel(board.side_to_move()) {
+        if self.game_state.has_castel(board.side_to_move()) {
             res += KING_CASTEL_BONUS;
         } else {
             res += KING_CASTEL_PEN;
-            if game_state.has_castel_right(board.side_to_move()) {
+            if self.game_state.has_castel_right(board.side_to_move()) {
                 res += KING_CASTEL_RIGHT_BONUS
             } else {
                 res += KING_CASTEL_RIGHT_PEN
@@ -253,8 +252,7 @@ impl<'a> Evaluation<'a> {
                 };
 
                 // game state is updated
-                let mut game_state = self.game_state.as_ref().borrow_mut();
-                game_state.update_game_phase(board_sum, board);
+                self.game_state.update_game_phase(board_sum, board);
 
                 let mut eval = eval
                     .saturating_add(self.discourage_queen_as_pinned(board))
@@ -262,7 +260,7 @@ impl<'a> Evaluation<'a> {
                     .saturating_sub(self.multiple_pawn_same_file(board))
                     .saturating_add(value_based_on_pos);
 
-                if game_state.game_phases().is_end() {
+                if self.game_state.game_phases().is_end() {
                     // check if opp king is in check -- give incentive
                     if board.checkers() != &BitBoard(0)
                         && self.engine_side.side_to_move() != board.side_to_move()
